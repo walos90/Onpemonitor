@@ -34,26 +34,14 @@ Correcciones:
 - Menos texto visual y colores más sobrios.
 
 
-## v56 desde v42 estable
-Esta versión parte de v42, indicada como última versión estable de consulta ONPE.
-Importante: no se modificó la lógica de conexión con ONPE.
+## Versión final segura desde v42
+Esta versión se reconstruyó desde v42, indicada como última versión estable.
+No se tocó la conexión con ONPE: `make_page` y `page_api` se mantuvieron idénticas a v42.
 
-Incluye:
-- Interfaz minimalista.
-- Horas de última actualización y último cambio detectado.
-- Excel por sección.
-- Botón CSV automático de Streamlit oculto.
-- Secciones restauradas.
-- Autoactualización más clara y tolerante a errores.
-
-
-## v57
-- Corrección quirúrgica sobre v56: eliminada referencia real a `display`.
-- Se verificó por AST que no queda `display` como variable.
-- No se modificó la conexión con ONPE.
-
-
-## v58
-- Corrige error de CSS dentro de f-string: Invalid format specifier ' none !important;'.
-- Se movió el estilo del recuadro de resumen al CSS global.
-- No se modificó la conexión con ONPE.
+Revisión realizada:
+- app.py compila.
+- No quedan referencias reales a `display`.
+- No hay CSS problemático dentro de f-string.
+- No hay botones CSV programados.
+- Se agregaron botones Excel por sección.
+- Se mantiene autoactualización más clara y tolerante a errores.

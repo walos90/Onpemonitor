@@ -1511,20 +1511,16 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
         f"""
 <div class="resumen-onpe-box">
   <div class="resumen-onpe-title">Resumen general</div>
-
   <div class="resumen-onpe-line"><b>{c1}</b>: {votos_1} votos{pct_1_txt}</div>
   <div class="resumen-onpe-line"><b>{c2}</b>: {votos_2} votos{pct_2_txt}</div>
-
   <div class="resumen-onpe-highlight">Va adelante: {resumen["lider"]}</div>
   <div class="resumen-onpe-line"><b>Diferencia de votos:</b> {diff_votos}</div>
   <div class="resumen-onpe-line"><b>Diferencia en porcentaje:</b> {diff_pp_txt}</div>
-
   <div class="resumen-onpe-small">Base: nivel general / ámbito general</div>
 </div>
         """,
         unsafe_allow_html=True,
     )
-
 
 
 def ordenar_columnas_principales(df: pd.DataFrame) -> pd.DataFrame:
@@ -1796,36 +1792,6 @@ hr {
   margin: 1rem 0;
   opacity: .35;
 }
-
-.resumen-onpe-box {
-  border: 1px solid rgba(120,120,120,.22);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin: 10px 0 18px 0;
-  background: rgba(120,120,120,.04);
-  color: inherit;
-}
-.resumen-onpe-title {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 9px;
-}
-.resumen-onpe-line {
-  font-size: 14px;
-  margin-bottom: 6px;
-}
-.resumen-onpe-highlight {
-  font-size: 15px;
-  font-weight: 700;
-  margin-top: 10px;
-  margin-bottom: 6px;
-}
-.resumen-onpe-small {
-  opacity: .58;
-  font-size: 12px;
-  margin-top: 10px;
-}
-
 </style>
         """,
         unsafe_allow_html=True,
@@ -1873,6 +1839,7 @@ def render_metric_cards(df_snapshot: pd.DataFrame, changes=None, fecha=None):
         st.markdown(f'<div class="metric-card"><div class="label">Última actualización</div><div class="value" style="font-size:18px;">{ultima_actualizacion}</div><div class="help">Última consulta exitosa · hora Perú</div></div>', unsafe_allow_html=True)
     with t2:
         st.markdown(f'<div class="metric-card"><div class="label">Último cambio detectado</div><div class="value" style="font-size:18px;">{ultimo_cambio}</div><div class="help">Última variación registrada · hora Perú</div></div>', unsafe_allow_html=True)
+
 
 def render_lectura_rapida(df_changes: pd.DataFrame, df_snapshot: pd.DataFrame):
     st.subheader("Lectura rápida de la actualización")
