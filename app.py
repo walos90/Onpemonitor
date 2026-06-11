@@ -1542,7 +1542,7 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
 /* Oculta la barra automática de Streamlit en tablas.
    Ese botón descarga CSV y no se puede convertir a Excel. */
 [data-testid="stElementToolbar"] {
-  display: none !important;
+  "display": none !important;
 }
 
 </style>

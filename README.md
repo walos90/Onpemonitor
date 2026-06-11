@@ -45,3 +45,9 @@ Incluye:
 - Botón CSV automático de Streamlit oculto.
 - Secciones restauradas.
 - Autoactualización más clara y tolerante a errores.
+
+
+## v57
+- Corrección quirúrgica sobre v56: eliminada referencia real a `display`.
+- Se verificó por AST que no queda `display` como variable.
+- No se modificó la conexión con ONPE.
