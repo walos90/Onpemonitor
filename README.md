@@ -77,3 +77,25 @@ Correcciones:
 - Quita el botón “Descargar todo en Excel”.
 - Cada sección tiene su propio botón de descarga Excel:
   tabla principal, resumen total, cambios actuales, historial, actas originales y candidatos originales.
+
+
+## v51
+- Restaura las secciones/cuadros visibles.
+- Mantiene resumen total, actualizaciones detectadas, cambios importantes, historial, tabla principal y campos originales.
+- Mantiene botones Excel por sección.
+- Quita duplicado del resumen debajo de la tabla.
+
+
+## v52 depurada
+- Revisión general y checklist de requisitos.
+- Autoactualización más robusta: mantiene estado activo tras errores, muestra última consulta exitosa y último error.
+- Si falla una consulta automática, no borra la base ni detiene el monitor; reintenta en el siguiente intervalo.
+- Oculta el botón CSV automático de Streamlit.
+- Mantiene botones Excel por sección y todas las secciones visibles.
+
+
+## v53
+- Agrega tarjetas de hora:
+  - Última actualización.
+  - Último cambio detectado.
+- Ambas se muestran en hora Perú.

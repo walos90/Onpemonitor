@@ -1899,6 +1899,22 @@ def render_header(fecha=None):
         unsafe_allow_html=True,
     )
 
+
+def obtener_hora_ultimo_cambio() -> str:
+    historial = cargar_historial()
+    if historial is None or historial.empty or "fecha_consulta" not in historial.columns:
+        return "Sin cambios registrados"
+
+    try:
+        fechas = historial["fecha_consulta"].dropna().astype(str)
+        fechas = fechas[fechas.str.strip() != ""]
+        if fechas.empty:
+            return "Sin cambios registrados"
+        return fechas.iloc[-1]
+    except Exception:
+        return "Sin cambios registrados"
+
+
 def render_metric_cards(df_snapshot: pd.DataFrame, changes=None, fecha=None):
     m = calcular_resumen_metricas(df_snapshot, changes)
     if not m:
@@ -1920,6 +1936,14 @@ def render_metric_cards(df_snapshot: pd.DataFrame, changes=None, fecha=None):
         st.markdown(f'<div class="metric-card"><div class="label">Actas contabilizadas</div><div class="value">{actas}</div><div class="help">Total general</div></div>', unsafe_allow_html=True)
     with c4:
         st.markdown(f'<div class="metric-card"><div class="label">Cambios detectados</div><div class="value">{m.get("cambios", 0)}</div><div class="help">Última revisión</div></div>', unsafe_allow_html=True)
+
+    ultima_actualizacion = fecha or st.session_state.get("last_success_time") or "Sin consultas"
+    ultimo_cambio = obtener_hora_ultimo_cambio()
+    t1, t2 = st.columns(2)
+    with t1:
+        st.markdown(f'<div class="metric-card"><div class="label">Última actualización</div><div class="value" style="font-size:18px;">{ultima_actualizacion}</div><div class="help">Última consulta exitosa · hora Perú</div></div>', unsafe_allow_html=True)
+    with t2:
+        st.markdown(f'<div class="metric-card"><div class="label">Último cambio detectado</div><div class="value" style="font-size:18px;">{ultimo_cambio}</div><div class="help">Última variación registrada · hora Perú</div></div>', unsafe_allow_html=True)
 
 
 def render_lectura_rapida(df_changes: pd.DataFrame, df_snapshot: pd.DataFrame):
@@ -2263,6 +2287,71 @@ def guardar_historial(changes, fecha_consulta):
     df_all.to_csv(HISTORY_FILE, index=False, encoding="utf-8")
 
 
+
+def render_historial_seccion():
+    st.subheader("Historial de cambios")
+    historial = cargar_historial()
+    if historial is None or historial.empty:
+        st.info("Aún no hay historial. Se crea cuando hay al menos dos consultas comparables y se detectan cambios.")
+        return
+
+    st.download_button(
+        "Descargar historial en Excel",
+        data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(historial), "Historial"),
+        file_name="historial_cambios_onpe.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
+    with st.expander("Ver historial acumulado"):
+        st.dataframe(preparar_cambios_para_mostrar(historial), use_container_width=True, hide_index=True)
+
+
+def render_cambios_vacio_o_actuales(changes, df_snapshot):
+    st.subheader("Actualizaciones detectadas")
+
+    if not changes:
+        render_lectura_rapida(pd.DataFrame(), df_snapshot)
+        st.info("No hay cambios nuevos en esta consulta.")
+        return
+
+    df_changes = preparar_cambios_ordenados(pd.DataFrame(changes))
+    render_lectura_rapida(df_changes, df_snapshot)
+
+    st.download_button(
+        "Descargar cambios actuales en Excel",
+        data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(df_changes), "Cambios actuales"),
+        file_name="cambios_actuales_onpe.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
+    st.subheader("Cambios importantes")
+    total_general_changes = cambios_total_general(df_changes)
+    candidate_changes = df_changes[df_changes["campo"].astype(str).str.contains("votos| %", case=False, na=False, regex=True)]
+
+    if not total_general_changes.empty:
+        st.markdown("**Total general**")
+        st.dataframe(style_changes(preparar_cambios_para_mostrar(total_general_changes)), use_container_width=True, hide_index=True)
+    elif not candidate_changes.empty:
+        st.markdown("**Votos y porcentajes de candidatos**")
+        st.dataframe(style_changes(preparar_cambios_para_mostrar(candidate_changes.head(20))), use_container_width=True, hide_index=True)
+    else:
+        st.info("No hubo cambios principales en votos o total general.")
+
+    with st.expander("Ver detalle completo de cambios"):
+        st.dataframe(style_changes(preparar_cambios_para_mostrar(df_changes)), use_container_width=True, hide_index=True)
+
+    resumen = (
+        df_changes.groupby(["ambito", "nivel"], dropna=False)
+        .agg(cantidad_cambios=("campo", "count"), variacion_abs=("variacion", lambda s: pd.to_numeric(s, errors="coerce").abs().sum()))
+        .reset_index()
+        .sort_values("cantidad_cambios", ascending=False)
+    )
+    with st.expander("Ver resumen técnico por ámbito"):
+        st.dataframe(preparar_tabla(resumen), use_container_width=True, hide_index=True)
+
+
 def run_consulta(include_provincias, include_extranjero, delay):
     status_box = st.empty()
     progress = st.progress(0)
@@ -2287,6 +2376,14 @@ if "auto_interval_min" not in st.session_state:
     st.session_state.auto_interval_min = 5
 if "last_refresh_count" not in st.session_state:
     st.session_state.last_refresh_count = -1
+if "auto_error_count" not in st.session_state:
+    st.session_state.auto_error_count = 0
+if "last_success_time" not in st.session_state:
+    st.session_state.last_success_time = None
+if "last_attempt_time" not in st.session_state:
+    st.session_state.last_attempt_time = None
+if "last_auto_error" not in st.session_state:
+    st.session_state.last_auto_error = None
 
 with st.sidebar:
     st.header("Consulta")
@@ -2311,10 +2408,22 @@ with st.sidebar:
     if start_auto:
         st.session_state.auto_monitor = True
         st.session_state.last_refresh_count = -1
+        st.session_state.auto_error_count = 0
+        st.session_state.last_auto_error = None
     if stop_auto:
         st.session_state.auto_monitor = False
 
-    st.caption("La pausa ayuda a evitar errores por demasiadas llamadas seguidas.")
+    if st.session_state.auto_monitor:
+        st.success("Autoactualización activa")
+    else:
+        st.caption("Autoactualización detenida")
+
+    if st.session_state.last_success_time:
+        st.caption(f"Última consulta exitosa: {st.session_state.last_success_time}")
+    if st.session_state.last_auto_error:
+        st.caption(f"Último error automático: {st.session_state.last_auto_error}")
+
+    st.caption("La autoactualización funciona mientras la pestaña esté abierta. Si la computadora o el navegador se suspenden, puede pausarse.")
 
 consultar = st.button("Actualizar y comparar", type="primary")
 limpiar = st.button("Borrar base")
@@ -2333,7 +2442,12 @@ if limpiar_historial:
 refresh_count = None
 if st.session_state.auto_monitor:
     if st_autorefresh is None:
-        st.error("Falta instalar streamlit-autorefresh. Ejecuta: python3 -m pip install streamlit-autorefresh")
+        st.warning("Autoactualización usando respaldo del navegador.")
+        st.markdown(
+            f'<meta http-equiv="refresh" content="{st.session_state.auto_interval_min * 60}">',
+            unsafe_allow_html=True,
+        )
+        refresh_count = st.session_state.last_refresh_count + 1
     else:
         refresh_count = st_autorefresh(
             interval=st.session_state.auto_interval_min * 60 * 1000,
@@ -2354,9 +2468,13 @@ should_run = consultar or should_run_auto
 
 if should_run:
     try:
+        st.session_state.last_attempt_time = fecha_hora_peru()
         previous, snapshot, changes = run_consulta(include_provincias, include_extranjero, delay)
 
         fecha_consulta = snapshot['_meta']['fecha_consulta']
+        st.session_state.last_success_time = fecha_consulta
+        st.session_state.auto_error_count = 0
+        st.session_state.last_auto_error = None
         st.success(f"Consulta realizada: {fecha_consulta}")
 
         rows = rows_snapshot(snapshot)
@@ -2366,65 +2484,15 @@ if should_run:
 
         st.markdown("---")
 
+        st.subheader("Resumen total")
+        mostrar_recuadro_resumen_candidatos(df_snapshot)
+
         if previous is None:
             st.info("Primera consulta guardada como base. La siguiente revisión mostrará cambios.")
-        elif not changes:
-            render_lectura_rapida(pd.DataFrame(), df_snapshot)
-            historial_para_descarga = cargar_historial()
-            if historial_para_descarga is not None and not historial_para_descarga.empty:
-                st.download_button(
-                    "Descargar historial en Excel",
-                    data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(historial_para_descarga), "Historial"),
-                    file_name="historial_cambios_onpe.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                )
         else:
-            df_changes = preparar_cambios_ordenados(pd.DataFrame(changes))
-            render_lectura_rapida(df_changes, df_snapshot)
+            render_cambios_vacio_o_actuales(changes, df_snapshot)
 
-            st.download_button(
-                "Descargar cambios actuales en Excel",
-                data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(df_changes), "Cambios actuales"),
-                file_name="cambios_actuales_onpe.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
-
-            historial_para_descarga = cargar_historial()
-            if historial_para_descarga is not None and not historial_para_descarga.empty:
-                st.download_button(
-                    "Descargar historial en Excel",
-                    data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(historial_para_descarga), "Historial"),
-                    file_name="historial_cambios_onpe.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                )
-
-            st.subheader("Cambios importantes")
-            total_general_changes = cambios_total_general(df_changes)
-            candidate_changes = df_changes[df_changes["campo"].astype(str).str.contains("votos| %", case=False, na=False, regex=True)]
-
-            if not total_general_changes.empty:
-                st.markdown("**Total general**")
-                st.dataframe(style_changes(preparar_cambios_para_mostrar(total_general_changes)), use_container_width=True, hide_index=True)
-            elif not candidate_changes.empty:
-                st.markdown("**Votos y porcentajes de candidatos**")
-                st.dataframe(style_changes(preparar_cambios_para_mostrar(candidate_changes.head(20))), use_container_width=True, hide_index=True)
-            else:
-                st.info("No hubo cambios principales en votos o total general.")
-
-            with st.expander("Ver detalle completo de cambios"):
-                st.dataframe(style_changes(preparar_cambios_para_mostrar(df_changes)), use_container_width=True, hide_index=True)
-
-            resumen = (
-                df_changes.groupby(["ambito", "nivel"], dropna=False)
-                .agg(cantidad_cambios=("campo", "count"), variacion_abs=("variacion", lambda s: pd.to_numeric(s, errors="coerce").abs().sum()))
-                .reset_index()
-                .sort_values("cantidad_cambios", ascending=False)
-            )
-            with st.expander("Ver resumen técnico por ámbito"):
-                st.dataframe(preparar_tabla(resumen), use_container_width=True, hide_index=True)
+        render_historial_seccion()
 
         st.subheader("Tabla principal")
 
@@ -2458,8 +2526,6 @@ if should_run:
         )
 
         st.dataframe(preparar_tabla(df_snapshot), use_container_width=True)
-
-        mostrar_recuadro_resumen_candidatos(df_snapshot)
 
         with st.expander("Ver campos originales de actas detectados por ONPE"):
             raw_df = pd.DataFrame(raw_actas_fields(snapshot))
@@ -2499,12 +2565,25 @@ if should_run:
             } for e in errors])), use_container_width=True)
 
     except Exception as e:
-        st.error(f"La consulta se detuvo: {e}")
+        st.session_state.auto_error_count += 1
+        st.session_state.last_auto_error = str(e)[:180]
+        st.error(f"La consulta falló: {e}")
+
+        if st.session_state.auto_monitor:
+            st.warning("La autoactualización sigue activa. La app intentará nuevamente en el próximo intervalo.")
+
+        prev = load_previous()
+        if prev:
+            st.info("Mientras tanto se mantiene visible la última base guardada.")
+            df_prev_guardada = preparar_tabla(ordenar_columnas_principales(pd.DataFrame(rows_snapshot(prev))))
+            st.subheader("Última base guardada")
+            st.dataframe(df_prev_guardada, use_container_width=True)
 else:
     prev = load_previous()
     if prev:
         st.info(f"Base guardada: {prev.get('_meta', {}).get('fecha_consulta')}. Puedes actualizar datos para comparar.")
         st.subheader("Base guardada")
+        st.caption(f"Último cambio detectado: {obtener_hora_ultimo_cambio()}")
         df_prev_guardada = preparar_tabla(ordenar_columnas_principales(pd.DataFrame(rows_snapshot(prev))))
         st.download_button(
             "Descargar base guardada en Excel",
