@@ -2,6 +2,15 @@
 import asyncio
 import json
 import re
+import subprocess
+from pathlib import Path
+
+def ensure_playwright_browsers():
+    marker = Path.home() / ".cache" / "ms-playwright"
+    if not marker.exists() or not any(marker.iterdir()):
+        subprocess.run(["playwright", "install", "chromium"], check=False)
+
+ensure_playwright_browsers()
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
