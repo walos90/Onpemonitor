@@ -34,3 +34,5 @@
 - [x] Si una consulta automática falla, mantiene la base anterior y reintenta.
 
 - [x] Verificado por AST: no queda ninguna variable display.
+
+- [x] Corregido CSS del recuadro resumen para evitar errores de f-string.

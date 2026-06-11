@@ -1509,44 +1509,6 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
 
     st.markdown(
         f"""
-<style>
-.resumen-onpe-box {{
-  border: 1px solid rgba(120,120,120,.22);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin: 10px 0 18px 0;
-  background: rgba(120,120,120,.04);
-  color: inherit;
-}}
-.resumen-onpe-title {{
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 9px;
-}}
-.resumen-onpe-line {{
-  font-size: 14px;
-  margin-bottom: 6px;
-}}
-.resumen-onpe-highlight {{
-  font-size: 15px;
-  font-weight: 700;
-  margin-top: 10px;
-  margin-bottom: 6px;
-}}
-.resumen-onpe-small {{
-  opacity: .58;
-  font-size: 12px;
-  margin-top: 10px;
-}}
-
-/* Oculta la barra automática de Streamlit en tablas.
-   Ese botón descarga CSV y no se puede convertir a Excel. */
-[data-testid="stElementToolbar"] {
-  "display": none !important;
-}
-
-</style>
-
 <div class="resumen-onpe-box">
   <div class="resumen-onpe-title">Resumen general</div>
 
@@ -1834,6 +1796,36 @@ hr {
   margin: 1rem 0;
   opacity: .35;
 }
+
+.resumen-onpe-box {
+  border: 1px solid rgba(120,120,120,.22);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 10px 0 18px 0;
+  background: rgba(120,120,120,.04);
+  color: inherit;
+}
+.resumen-onpe-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 9px;
+}
+.resumen-onpe-line {
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.resumen-onpe-highlight {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+.resumen-onpe-small {
+  opacity: .58;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
 </style>
         """,
         unsafe_allow_html=True,

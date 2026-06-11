@@ -51,3 +51,9 @@ Incluye:
 - Corrección quirúrgica sobre v56: eliminada referencia real a `display`.
 - Se verificó por AST que no queda `display` como variable.
 - No se modificó la conexión con ONPE.
+
+
+## v58
+- Corrige error de CSS dentro de f-string: Invalid format specifier ' none !important;'.
+- Se movió el estilo del recuadro de resumen al CSS global.
+- No se modificó la conexión con ONPE.
