@@ -43,3 +43,9 @@ Correcciones:
 - Mantiene la consulta de departamentos.
 - Hace más robusta la consulta API: URL absoluta, sesión ONPE, reintentos y recarga si ONPE devuelve HTML.
 - Solo usa respaldo si ONPE falla después de varios intentos.
+
+
+## v45
+- Inicializa la sesión en /main/resumen, que es la ruta real del portal ONPE.
+- Reintenta las llamadas API después de cargar correctamente el frontend.
+- Mantiene interfaz minimalista y descarga Excel.

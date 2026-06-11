@@ -39,6 +39,7 @@ except Exception:
 
 BASE_ORIGIN = "https://resultadosegundavuelta.onpe.gob.pe"
 BASE = "/presentacion-backend"
+FRONT_PATH = "/main/resumen"
 ID_ELECCION = 10
 SNAPSHOT_FILE = Path("snapshot_anterior_playwright_v5.json")
 HISTORY_FILE = Path("historial_cambios_onpe.csv")
@@ -860,7 +861,8 @@ async def make_page():
         ),
     )
     page = await context.new_page()
-    await page.goto(f"{BASE_ORIGIN}/resumen", wait_until="domcontentloaded", timeout=45000)
+    await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="networkidle", timeout=60000)
+    await page.wait_for_timeout(1200)
     return pw, browser, page
 
 
@@ -878,8 +880,8 @@ async def page_api(page, path: str, params: Dict[str, Any], retries: int = 4, ti
             # Asegura que el navegador tenga sesión/origen ONPE antes de pedir JSON.
             if attempt > 1:
                 try:
-                    await page.goto(f"{BASE_ORIGIN}/resumen", wait_until="domcontentloaded", timeout=45000)
-                    await page.wait_for_timeout(700)
+                    await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="networkidle", timeout=60000)
+                    await page.wait_for_timeout(1200)
                 except Exception:
                     pass
 
@@ -915,7 +917,7 @@ async def page_api(page, path: str, params: Dict[str, Any], retries: int = 4, ti
                 raise RuntimeError(f"ONPE HTTP {status}")
 
             if text.startswith("<") or "text/html" in content_type:
-                raise RuntimeError("ONPE devolvió HTML")
+                raise RuntimeError(f"ONPE devolvió HTML (status {status})")
 
             parsed = json.loads(text)
             return parsed.get("data", parsed)
