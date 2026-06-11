@@ -4,13 +4,23 @@ import json
 import re
 import subprocess
 from pathlib import Path
+import sys
 
 def ensure_playwright_browsers():
     marker = Path.home() / ".cache" / "ms-playwright"
-    if not marker.exists() or not any(marker.iterdir()):
-        subprocess.run(["playwright", "install", "chromium"], check=False)
+    if marker.exists() and any(marker.iterdir()):
+        return
 
-ensure_playwright_browsers()
+    subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        check=False,
+        timeout=180,
+    )
+
+try:
+    ensure_playwright_browsers()
+except Exception:
+    pass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
