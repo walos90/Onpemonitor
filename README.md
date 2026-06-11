@@ -1,10 +1,7 @@
-# Monitor ONPE Desktop v37 resumen
+# Monitor ONPE Desktop v38 resumen corregido
 
-Agrega un recuadro separado con resumen total entre candidatos:
-- votos totales de cada candidato
-- porcentaje de cada candidato
-- quién va adelante
-- diferencia de votos
-- diferencia en puntos porcentuales
-
-No agrega columnas nuevas a la tabla principal.
+Correcciones:
+- El recuadro de resumen usa estrictamente la fila Nivel general / Ámbito general.
+- Ya no toma por error total / PERU ni total / EXTRANJERO.
+- El recuadro usa colores compatibles con modo oscuro y modo claro.
+- No agrega columnas nuevas a la tabla principal.

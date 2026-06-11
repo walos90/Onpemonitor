@@ -1384,8 +1384,12 @@ def raw_actas_fields(snapshot):
 
 def obtener_resumen_total_candidatos(df: pd.DataFrame) -> Dict[str, Any]:
     """
-    Obtiene solo el resumen TOTAL GENERAL entre los dos candidatos.
-    Se muestra en un recuadro separado, no como columnas adicionales.
+    Obtiene SOLO el resumen TOTAL GENERAL entre los dos candidatos.
+
+    Regla correcta:
+    1. Usar la fila donde Nivel == general y Ámbito == general.
+    2. No usar las filas total / PERU ni total / EXTRANJERO.
+    3. Solo si no existe general/general, usar la última fila disponible como respaldo.
     """
     if df is None or df.empty:
         return {}
@@ -1394,18 +1398,20 @@ def obtener_resumen_total_candidatos(df: pd.DataFrame) -> Dict[str, Any]:
 
     total_row = None
 
-    # Prioridad: TOTAL GENERAL / GENERAL.
-    if "lugar" in dfx.columns:
-        mask = dfx["lugar"].astype(str).str.upper().str.contains("TOTAL|GENERAL", na=False)
-        if mask.any():
-            total_row = dfx[mask].iloc[0]
+    if "nivel" in dfx.columns and "ambito" in dfx.columns:
+        nivel = dfx["nivel"].astype(str).str.strip().str.lower()
+        ambito = dfx["ambito"].astype(str).str.strip().str.lower()
 
-    # Fallback: primera fila.
+        mask_general = (nivel == "general") & (ambito == "general")
+        if mask_general.any():
+            total_row = dfx[mask_general].iloc[0]
+
+    # Respaldo: si no encuentra general/general, usa la última fila.
+    # Esto evita agarrar por error total/PERU como total general.
     if total_row is None:
-        total_row = dfx.iloc[0]
+        total_row = dfx.iloc[-1]
 
     votos_cols = [c for c in dfx.columns if str(c).lower().strip().endswith(" votos")]
-    pct_cols = [c for c in dfx.columns if str(c).lower().strip().endswith(" %")]
 
     if len(votos_cols) < 2:
         return {}
@@ -1441,6 +1447,7 @@ def obtener_resumen_total_candidatos(df: pd.DataFrame) -> Dict[str, Any]:
         diferencia_pp = abs(float(p1) - float(p2))
 
     return {
+        "fila_usada": "general / general",
         "candidato_1": n1,
         "votos_1": int(round(float(v1))),
         "porcentaje_1": p1,
@@ -1479,13 +1486,48 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
 
     st.markdown(
         f"""
-<div style="border:1px solid #ddd; border-radius:12px; padding:18px; margin:12px 0; background:#fafafa;">
-  <div style="font-size:18px; font-weight:700; margin-bottom:10px;">Resultado total actualizado</div>
-  <div style="font-size:16px; margin-bottom:6px;"><b>{c1}</b>: {votos_1} votos{pct_1_txt}</div>
-  <div style="font-size:16px; margin-bottom:14px;"><b>{c2}</b>: {votos_2} votos{pct_2_txt}</div>
-  <div style="font-size:16px; margin-bottom:6px;"><b>Va adelante:</b> {resumen["lider"]}</div>
-  <div style="font-size:16px; margin-bottom:6px;"><b>Diferencia de votos:</b> {diff_votos}</div>
-  <div style="font-size:16px;"><b>Diferencia en porcentaje:</b> {diff_pp_txt}</div>
+<style>
+.resumen-onpe-box {{
+  border: 1px solid rgba(128,128,128,0.45);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 12px 0 22px 0;
+  background: rgba(128,128,128,0.10);
+  color: inherit;
+}}
+.resumen-onpe-title {{
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}}
+.resumen-onpe-line {{
+  font-size: 16px;
+  margin-bottom: 7px;
+}}
+.resumen-onpe-highlight {{
+  font-size: 17px;
+  font-weight: 800;
+  margin-top: 12px;
+  margin-bottom: 7px;
+}}
+.resumen-onpe-small {{
+  opacity: 0.72;
+  font-size: 13px;
+  margin-top: 12px;
+}}
+</style>
+
+<div class="resumen-onpe-box">
+  <div class="resumen-onpe-title">Resultado total general actualizado</div>
+
+  <div class="resumen-onpe-line"><b>{c1}</b>: {votos_1} votos{pct_1_txt}</div>
+  <div class="resumen-onpe-line"><b>{c2}</b>: {votos_2} votos{pct_2_txt}</div>
+
+  <div class="resumen-onpe-highlight">Va adelante: {resumen["lider"]}</div>
+  <div class="resumen-onpe-line"><b>Diferencia de votos:</b> {diff_votos}</div>
+  <div class="resumen-onpe-line"><b>Diferencia en porcentaje:</b> {diff_pp_txt}</div>
+
+  <div class="resumen-onpe-small">Fila usada: Nivel general / Ámbito general</div>
 </div>
         """,
         unsafe_allow_html=True,
@@ -1599,11 +1641,11 @@ def run_consulta(include_provincias, include_extranjero, delay):
     return previous, snapshot, changes
 
 
-st.set_page_config(page_title="Monitor ONPE Desktop v37", layout="wide")
-st.title("Monitor ONPE — resumen total v37")
+st.set_page_config(page_title="Monitor ONPE Desktop v38", layout="wide")
+st.title("Monitor ONPE — resumen corregido v38")
 
 st.write(
-    "Agrega un recuadro separado con resumen total de votos y diferencia entre candidatos."
+    "Corrige el resumen: usa solo general/general y recuadro visible en modo oscuro."
 )
 
 if "auto_monitor" not in st.session_state:
