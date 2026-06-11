@@ -1533,6 +1533,27 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
     pct_2_txt = f" — {format_number_for_display(p2, 3)} %" if p2 is not None else ""
     diff_pp_txt = f"{format_number_for_display(diff_pp, 3)} puntos %" if diff_pp is not None else "No disponible"
 
+    resumen_df = pd.DataFrame([{
+        "candidato_1": c1,
+        "votos_1": resumen.get("votos_1"),
+        "porcentaje_1": p1,
+        "candidato_2": c2,
+        "votos_2": resumen.get("votos_2"),
+        "porcentaje_2": p2,
+        "va_adelante": resumen.get("lider"),
+        "diferencia_votos": resumen.get("diferencia_votos"),
+        "diferencia_puntos_porcentuales": diff_pp,
+        "fila_usada": "nivel general / ámbito general",
+    }])
+
+    st.download_button(
+        "Descargar resumen total en Excel",
+        data=dataframe_simple_to_excel_bytes(preparar_tabla(resumen_df), "Resumen total"),
+        file_name="resumen_total_onpe.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
     st.markdown(
         f"""
 <style>
@@ -1564,6 +1585,13 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
   font-size: 12px;
   margin-top: 10px;
 }}
+
+/* Oculta la barra automática de Streamlit en tablas.
+   Ese botón descarga CSV y no se puede cambiar a Excel. */
+[data-testid="stElementToolbar"] {
+  display: none !important;
+}
+
 </style>
 
 <div class="resumen-onpe-box">
@@ -1970,6 +1998,28 @@ def crear_excel_historial(historial: pd.DataFrame, cambios_actuales: pd.DataFram
 
 
 
+
+def dataframe_simple_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Datos") -> bytes:
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_to_write = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        df_to_write.to_excel(writer, index=False, sheet_name=sheet_name[:31])
+        ws = writer.book[sheet_name[:31]]
+        ws.freeze_panes = "A2"
+        if df_to_write.shape[1] > 0:
+            ws.auto_filter.ref = ws.dimensions
+        for column_cells in ws.columns:
+            max_len = 0
+            letter = column_cells[0].column_letter
+            for cell in column_cells:
+                try:
+                    max_len = max(max_len, len("" if cell.value is None else str(cell.value)))
+                except Exception:
+                    pass
+            ws.column_dimensions[letter].width = min(max(max_len + 2, 12), 45)
+    return output.getvalue()
+
+
 def snapshot_to_excel_bytes(snapshot: Dict[str, Any]) -> bytes:
     """
     Exporta la base actual completa en Excel.
@@ -2080,6 +2130,88 @@ Esta parte sirve para que no pierdas la base si Streamlit se reinicia o si actua
         if uploaded is not None:
             if st.button("Restaurar base JSON"):
                 restaurar_base_desde_upload(uploaded)
+
+
+
+
+def dataframe_to_excel_bytes(sheets: Dict[str, pd.DataFrame]) -> bytes:
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        for sheet_name, df_sheet in sheets.items():
+            safe_name = str(sheet_name)[:31] or "Datos"
+            df_to_write = df_sheet.copy() if isinstance(df_sheet, pd.DataFrame) else pd.DataFrame()
+            df_to_write.to_excel(writer, index=False, sheet_name=safe_name)
+            ws = writer.book[safe_name]
+            ws.freeze_panes = "A2"
+            if df_to_write.shape[1] > 0:
+                ws.auto_filter.ref = ws.dimensions
+            for column_cells in ws.columns:
+                max_len = 0
+                letter = column_cells[0].column_letter
+                for cell in column_cells:
+                    try:
+                        max_len = max(max_len, len("" if cell.value is None else str(cell.value)))
+                    except Exception:
+                        pass
+                ws.column_dimensions[letter].width = min(max(max_len + 2, 12), 45)
+    return output.getvalue()
+
+
+
+def resumen_total_to_dataframe(df_snapshot: pd.DataFrame) -> pd.DataFrame:
+    resumen = obtener_resumen_total_candidatos(df_snapshot)
+    if not resumen:
+        return pd.DataFrame()
+    return pd.DataFrame([{
+        "candidato_1": resumen.get("candidato_1"),
+        "votos_1": resumen.get("votos_1"),
+        "porcentaje_1": resumen.get("porcentaje_1"),
+        "candidato_2": resumen.get("candidato_2"),
+        "votos_2": resumen.get("votos_2"),
+        "porcentaje_2": resumen.get("porcentaje_2"),
+        "va_adelante": resumen.get("lider"),
+        "diferencia_votos": resumen.get("diferencia_votos"),
+        "diferencia_puntos_porcentuales": resumen.get("diferencia_pp"),
+        "fila_usada": "nivel general / ámbito general",
+    }])
+
+
+def exportar_todas_las_tablas_excel(
+    df_snapshot: pd.DataFrame,
+    snapshot: Dict[str, Any],
+    historial: pd.DataFrame = None,
+    cambios_actuales: pd.DataFrame = None,
+) -> bytes:
+    """
+    Exporta todas las tablas relevantes en un solo Excel, con una hoja por tabla.
+    """
+    sheets = {
+        "Tabla principal": preparar_tabla(df_snapshot),
+    }
+
+    resumen_df = resumen_total_to_dataframe(df_snapshot)
+    if not resumen_df.empty:
+        sheets["Resumen total"] = preparar_tabla(resumen_df)
+
+    if cambios_actuales is not None and not cambios_actuales.empty:
+        sheets["Cambios actuales"] = preparar_cambios_para_mostrar(preparar_cambios_ordenados(cambios_actuales))
+
+    if historial is not None and not historial.empty:
+        sheets["Historial cambios"] = preparar_cambios_para_mostrar(historial)
+
+    raw_actas = pd.DataFrame(raw_actas_fields(snapshot))
+    if not raw_actas.empty:
+        sheets["Actas originales"] = preparar_tabla(raw_actas)
+
+    raw_partidos = pd.DataFrame(raw_participantes_fields(snapshot))
+    if not raw_partidos.empty:
+        sheets["Candidatos originales"] = preparar_tabla(raw_partidos)
+
+    meta = pd.DataFrame([snapshot.get("_meta", {})]) if snapshot else pd.DataFrame()
+    if not meta.empty:
+        sheets["Meta"] = meta
+
+    return dataframe_to_excel_bytes(sheets) if "dataframe_to_excel_bytes" in globals() else dataframe_simple_to_excel_bytes(sheets["Tabla principal"], "Tabla principal")
 
 
 
@@ -2238,9 +2370,36 @@ if should_run:
             st.info("Primera consulta guardada como base. La siguiente revisión mostrará cambios.")
         elif not changes:
             render_lectura_rapida(pd.DataFrame(), df_snapshot)
+            historial_para_descarga = cargar_historial()
+            if historial_para_descarga is not None and not historial_para_descarga.empty:
+                st.download_button(
+                    "Descargar historial en Excel",
+                    data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(historial_para_descarga), "Historial"),
+                    file_name="historial_cambios_onpe.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
         else:
             df_changes = preparar_cambios_ordenados(pd.DataFrame(changes))
             render_lectura_rapida(df_changes, df_snapshot)
+
+            st.download_button(
+                "Descargar cambios actuales en Excel",
+                data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(df_changes), "Cambios actuales"),
+                file_name="cambios_actuales_onpe.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+
+            historial_para_descarga = cargar_historial()
+            if historial_para_descarga is not None and not historial_para_descarga.empty:
+                st.download_button(
+                    "Descargar historial en Excel",
+                    data=dataframe_simple_to_excel_bytes(preparar_cambios_para_mostrar(historial_para_descarga), "Historial"),
+                    file_name="historial_cambios_onpe.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
 
             st.subheader("Cambios importantes")
             total_general_changes = cambios_total_general(df_changes)
@@ -2267,9 +2426,6 @@ if should_run:
             with st.expander("Ver resumen técnico por ámbito"):
                 st.dataframe(preparar_tabla(resumen), use_container_width=True, hide_index=True)
 
-        historial = cargar_historial()
-        render_descargas(historial, pd.DataFrame(changes) if changes else pd.DataFrame(), snapshot)
-
         st.subheader("Tabla principal")
 
         columnas_partidos = [
@@ -2293,6 +2449,14 @@ if should_run:
         except Exception:
             pass
 
+        st.download_button(
+            "Descargar tabla principal en Excel",
+            data=dataframe_simple_to_excel_bytes(preparar_tabla(df_snapshot), "Tabla principal"),
+            file_name="tabla_principal_onpe.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
         st.dataframe(preparar_tabla(df_snapshot), use_container_width=True)
 
         mostrar_recuadro_resumen_candidatos(df_snapshot)
@@ -2302,6 +2466,13 @@ if should_run:
             if raw_df.empty:
                 st.info("No se encontraron campos crudos de actas en la respuesta.")
             else:
+                st.download_button(
+                    "Descargar actas originales en Excel",
+                    data=dataframe_simple_to_excel_bytes(preparar_tabla(raw_df), "Actas originales"),
+                    file_name="actas_originales_onpe.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
                 st.dataframe(preparar_tabla(raw_df), use_container_width=True)
 
         with st.expander("Ver campos originales de agrupaciones/candidatos detectados por ONPE"):
@@ -2309,6 +2480,13 @@ if should_run:
             if raw_part_df.empty:
                 st.info("No se encontraron campos crudos de participantes en la respuesta.")
             else:
+                st.download_button(
+                    "Descargar candidatos originales en Excel",
+                    data=dataframe_simple_to_excel_bytes(preparar_tabla(raw_part_df), "Candidatos originales"),
+                    file_name="candidatos_originales_onpe.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
                 st.dataframe(preparar_tabla(raw_part_df), use_container_width=True)
 
         errors = [v for v in snapshot.get("lugares", {}).values() if v.get("error")]
@@ -2327,6 +2505,14 @@ else:
     if prev:
         st.info(f"Base guardada: {prev.get('_meta', {}).get('fecha_consulta')}. Puedes actualizar datos para comparar.")
         st.subheader("Base guardada")
-        st.dataframe(preparar_tabla(ordenar_columnas_principales(pd.DataFrame(rows_snapshot(prev)))), use_container_width=True)
+        df_prev_guardada = preparar_tabla(ordenar_columnas_principales(pd.DataFrame(rows_snapshot(prev))))
+        st.download_button(
+            "Descargar base guardada en Excel",
+            data=dataframe_simple_to_excel_bytes(df_prev_guardada, "Base guardada"),
+            file_name="base_guardada_onpe.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+        st.dataframe(df_prev_guardada, use_container_width=True)
     else:
         st.info("Todavía no hay base guardada. Haz una primera consulta.")

@@ -60,3 +60,20 @@ Correcciones:
 ## v47
 - Se verificó que no haya botones de descarga CSV.
 - El botón de descarga genera únicamente Excel .xlsx.
+
+
+## v48
+- Oculta el botón automático de descarga CSV de las tablas de Streamlit.
+- Agrega botón propio para descargar la tabla principal en Excel .xlsx.
+
+
+## v49
+- Agrega botón “Descargar todo en Excel”.
+- El Excel incluye hojas: Tabla principal, Resumen total, Cambios actuales, Historial, Actas originales, Candidatos originales y Meta.
+- Mantiene botón opcional para descargar solo la tabla principal.
+
+
+## v50
+- Quita el botón “Descargar todo en Excel”.
+- Cada sección tiene su propio botón de descarga Excel:
+  tabla principal, resumen total, cambios actuales, historial, actas originales y candidatos originales.
