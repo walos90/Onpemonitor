@@ -49,3 +49,9 @@ Correcciones:
 - Inicializa la sesión en /main/resumen, que es la ruta real del portal ONPE.
 - Reintenta las llamadas API después de cargar correctamente el frontend.
 - Mantiene interfaz minimalista y descarga Excel.
+
+
+## v46
+- Corrige inicialización de sesión ONPE para evitar "SessionInfo before it was initialized".
+- Abre primero el dominio principal y luego el resumen.
+- Usa domcontentloaded en vez de networkidle para no quedar atrapado en errores internos del frontend ONPE.

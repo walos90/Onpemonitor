@@ -861,8 +861,22 @@ async def make_page():
         ),
     )
     page = await context.new_page()
-    await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="networkidle", timeout=60000)
-    await page.wait_for_timeout(1200)
+
+    # Inicialización suave: ONPE puede fallar si se entra directo a /main/resumen
+    # antes de que su SessionInfo esté lista.
+    try:
+        await page.goto(BASE_ORIGIN, wait_until="domcontentloaded", timeout=45000)
+        await page.wait_for_timeout(1200)
+    except Exception:
+        pass
+
+    try:
+        await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="domcontentloaded", timeout=45000)
+        await page.wait_for_timeout(2000)
+    except Exception:
+        # No detenemos aquí. La API se reintentará en page_api.
+        pass
+
     return pw, browser, page
 
 
@@ -880,8 +894,10 @@ async def page_api(page, path: str, params: Dict[str, Any], retries: int = 4, ti
             # Asegura que el navegador tenga sesión/origen ONPE antes de pedir JSON.
             if attempt > 1:
                 try:
-                    await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="networkidle", timeout=60000)
-                    await page.wait_for_timeout(1200)
+                    await page.goto(BASE_ORIGIN, wait_until="domcontentloaded", timeout=45000)
+                    await page.wait_for_timeout(800)
+                    await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="domcontentloaded", timeout=45000)
+                    await page.wait_for_timeout(1500)
                 except Exception:
                     pass
 
