@@ -3,7 +3,9 @@ import asyncio
 import json
 import re
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from typing import Any, Dict
 from urllib.parse import urlencode
 
@@ -1069,7 +1071,7 @@ async def build_snapshot(include_provincias, include_extranjero, delay, status_b
         status_box.success("Consulta terminada.")
         return {
             "_meta": {
-                "fecha_consulta": datetime.now().isoformat(timespec="seconds"),
+                "fecha_consulta": fecha_hora_peru(),
                 "idEleccion": ID_ELECCION,
             },
             "lugares": lugares,
@@ -1599,6 +1601,305 @@ def style_changes(df: pd.DataFrame):
 
 
 
+
+PERU_TZ = ZoneInfo("America/Lima")
+
+
+def fecha_hora_peru(dt: datetime | None = None) -> str:
+    """Devuelve fecha/hora fija en huso horario de Perú."""
+    if dt is None:
+        dt = datetime.now(PERU_TZ)
+    elif dt.tzinfo is None:
+        dt = dt.replace(tzinfo=PERU_TZ)
+    else:
+        dt = dt.astimezone(PERU_TZ)
+    return dt.strftime("%d/%m/%Y %H:%M:%S") + " — hora Perú"
+
+
+def prioridad_cambio(row) -> tuple:
+    nivel = str(row.get("nivel", "")).strip().lower()
+    ambito = str(row.get("ambito", "")).strip().lower()
+    lugar = str(row.get("lugar", "")).strip().lower()
+    campo = str(row.get("campo", "")).strip().lower()
+
+    if nivel == "general" and ambito == "general":
+        p_lugar = 0
+    elif nivel == "total":
+        p_lugar = 1
+    elif "peru" in ambito:
+        p_lugar = 2
+    elif "extranjero" in ambito:
+        p_lugar = 3
+    else:
+        p_lugar = 4
+
+    if "votos" in campo:
+        p_campo = 0
+    elif campo.endswith(" %") or "porcentaje" in campo or "porc" in campo:
+        p_campo = 1
+    elif "acta" in campo:
+        p_campo = 2
+    else:
+        p_campo = 3
+
+    try:
+        variacion = abs(float(row.get("variacion", 0) or 0))
+    except Exception:
+        variacion = 0
+
+    return (p_lugar, p_campo, -variacion, lugar, campo)
+
+
+def preparar_cambios_ordenados(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    dfx = df.copy()
+    dfx["__orden"] = dfx.apply(prioridad_cambio, axis=1)
+    dfx = dfx.sort_values("__orden").drop(columns=["__orden"])
+    return dfx
+
+
+def cambios_total_general(df_changes: pd.DataFrame) -> pd.DataFrame:
+    if df_changes is None or df_changes.empty:
+        return pd.DataFrame()
+    nivel = df_changes.get("nivel", pd.Series(dtype=str)).astype(str).str.strip().str.lower()
+    ambito = df_changes.get("ambito", pd.Series(dtype=str)).astype(str).str.strip().str.lower()
+    return df_changes[(nivel == "general") & (ambito == "general")].copy()
+
+
+def texto_delta_votos_total(df_changes: pd.DataFrame) -> list[str]:
+    out = []
+    total = cambios_total_general(df_changes)
+    if total.empty:
+        return out
+    total = total[total["campo"].astype(str).str.lower().str.contains("votos", na=False)]
+    total = preparar_cambios_ordenados(total).head(4)
+    for _, r in total.iterrows():
+        campo = str(r.get("campo", ""))
+        partido = campo.replace(" votos", "").strip()
+        var = parse_onpe_number(r.get("variacion"), "votos")
+        if var is None:
+            continue
+        signo = "+" if var >= 0 else "−"
+        out.append(f"{partido}: {signo}{format_number_for_display(abs(var), 0)} votos")
+    return out
+
+
+def calcular_resumen_metricas(df_snapshot: pd.DataFrame, changes=None) -> Dict[str, Any]:
+    resumen = obtener_resumen_total_candidatos(df_snapshot)
+    if not resumen:
+        return {}
+
+    actas_cont = None
+    actas_total = None
+    try:
+        dfx = df_snapshot.copy()
+        mask = (dfx["nivel"].astype(str).str.lower().str.strip() == "general") & (dfx["ambito"].astype(str).str.lower().str.strip() == "general")
+        row = dfx[mask].iloc[0] if mask.any() else dfx.iloc[-1]
+        actas_cont = parse_onpe_number(row.get("actas_contabilizadas"), "actas_contabilizadas")
+        actas_total = parse_onpe_number(row.get("actas_total"), "actas_total")
+    except Exception:
+        pass
+
+    return {
+        **resumen,
+        "actas_contabilizadas": actas_cont,
+        "actas_total": actas_total,
+        "cambios": len(changes or []),
+    }
+
+
+def render_css():
+    st.markdown(
+        """
+<style>
+.block-container { padding-top: 1.4rem; }
+.onpe-hero {
+  border-radius: 22px;
+  padding: 24px 26px;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, rgba(25, 74, 160, .95), rgba(21, 126, 179, .86));
+  color: white;
+  box-shadow: 0 14px 38px rgba(0,0,0,.18);
+}
+.onpe-hero h1 { margin: 0; font-size: 34px; letter-spacing: -.02em; }
+.onpe-hero p { margin: 8px 0 0 0; font-size: 16px; opacity: .94; }
+.onpe-pill {
+  display: inline-block;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.28);
+  font-size: 13px;
+  margin-bottom: 11px;
+}
+.metric-card {
+  border: 1px solid rgba(128,128,128,.22);
+  border-radius: 18px;
+  padding: 16px 17px;
+  background: rgba(128,128,128,.08);
+  min-height: 118px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.06);
+}
+.metric-card .label { font-size: 13px; opacity: .72; margin-bottom: 6px; }
+.metric-card .value { font-size: 24px; font-weight: 800; line-height: 1.15; }
+.metric-card .help { font-size: 12px; opacity: .68; margin-top: 8px; }
+.section-card {
+  border: 1px solid rgba(128,128,128,.25);
+  border-radius: 18px;
+  padding: 18px 20px;
+  background: rgba(128,128,128,.07);
+  margin: 12px 0 18px 0;
+}
+.quick-line {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(128,128,128,.15);
+  font-size: 15px;
+}
+.quick-line:last-child { border-bottom: none; }
+.small-muted { opacity: .70; font-size: 13px; }
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_header(fecha=None):
+    fecha_txt = fecha or fecha_hora_peru()
+    st.markdown(
+        f"""
+<div class="onpe-hero">
+  <div class="onpe-pill">ONPE · seguimiento no oficial</div>
+  <h1>Dashboard Electoral ONPE</h1>
+  <p>Seguimiento de votos, actas, diferencia entre candidatos y variaciones detectadas.</p>
+  <p style="font-size:13px; opacity:.85; margin-top:10px;">Hora de referencia: {fecha_txt}</p>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_metric_cards(df_snapshot: pd.DataFrame, changes=None, fecha=None):
+    m = calcular_resumen_metricas(df_snapshot, changes)
+    if not m:
+        return
+
+    c1, c2, c3, c4 = st.columns(4)
+    diff = format_number_for_display(m.get("diferencia_votos"), 0)
+    actas = ""
+    if m.get("actas_contabilizadas") is not None and m.get("actas_total") is not None:
+        actas = f'{format_number_for_display(m.get("actas_contabilizadas"), 0)} / {format_number_for_display(m.get("actas_total"), 0)}'
+    else:
+        actas = "No disponible"
+
+    with c1:
+        st.markdown(f'<div class="metric-card"><div class="label">Va adelante</div><div class="value">{m.get("lider", "")}</div><div class="help">Según fila general / general</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'<div class="metric-card"><div class="label">Diferencia de votos</div><div class="value">{diff}</div><div class="help">Entre los dos candidatos</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown(f'<div class="metric-card"><div class="label">Actas contabilizadas</div><div class="value">{actas}</div><div class="help">Total general</div></div>', unsafe_allow_html=True)
+    with c4:
+        st.markdown(f'<div class="metric-card"><div class="label">Cambios detectados</div><div class="value">{m.get("cambios", 0)}</div><div class="help">Última revisión</div></div>', unsafe_allow_html=True)
+
+
+def render_lectura_rapida(df_changes: pd.DataFrame, df_snapshot: pd.DataFrame):
+    st.subheader("Lectura rápida de la actualización")
+
+    if df_changes is None or df_changes.empty:
+        st.markdown('<div class="section-card"><div class="quick-line">No se detectaron cambios frente a la consulta anterior.</div></div>', unsafe_allow_html=True)
+        return
+
+    total = cambios_total_general(df_changes)
+    votos_total = texto_delta_votos_total(df_changes)
+    resumen = obtener_resumen_total_candidatos(df_snapshot)
+
+    lineas = []
+    lineas.append(f"Se detectaron <b>{len(df_changes)}</b> variaciones en esta revisión.")
+
+    if not total.empty:
+        lineas.append(f"En el <b>total general</b> hubo <b>{len(total)}</b> cambio(s).")
+    else:
+        lineas.append("No hubo cambios directos en la fila <b>general / general</b>.")
+
+    for t in votos_total:
+        lineas.append(t)
+
+    if resumen:
+        diff = format_number_for_display(resumen.get("diferencia_votos"), 0)
+        pp = resumen.get("diferencia_pp")
+        pp_txt = f" · {format_number_for_display(pp, 3)} puntos %" if pp is not None else ""
+        lineas.append(f"Actualmente va adelante <b>{resumen.get('lider')}</b> por <b>{diff}</b> votos{pp_txt}.")
+
+    html = '<div class="section-card">' + ''.join(f'<div class="quick-line">{x}</div>' for x in lineas) + '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def crear_excel_historial(historial: pd.DataFrame, cambios_actuales: pd.DataFrame | None = None) -> bytes:
+    """Crea un Excel real con filtros, tablas y columnas ordenadas."""
+    output = BytesIO()
+
+    hist = preparar_cambios_ordenados(historial.copy()) if historial is not None and not historial.empty else pd.DataFrame()
+    actual = preparar_cambios_ordenados(cambios_actuales.copy()) if cambios_actuales is not None and not cambios_actuales.empty else pd.DataFrame()
+
+    # Columnas lógicas primero.
+    orden = ["fecha_consulta", "lugar", "nivel", "ambito", "campo", "antes", "ahora", "variacion", "tipo_cambio", "codigo"]
+    def ordenar_cols(df):
+        if df is None or df.empty:
+            return df
+        cols = [c for c in orden if c in df.columns] + [c for c in df.columns if c not in orden]
+        return df[cols]
+
+    hist = ordenar_cols(hist)
+    actual = ordenar_cols(actual)
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        if not actual.empty:
+            preparar_cambios_para_mostrar(actual).to_excel(writer, sheet_name="Ultima actualizacion", index=False)
+        if not hist.empty:
+            preparar_cambios_para_mostrar(hist).to_excel(writer, sheet_name="Historial completo", index=False)
+        if actual.empty and hist.empty:
+            pd.DataFrame([{"Mensaje": "Todavía no hay cambios registrados."}]).to_excel(writer, sheet_name="Historial", index=False)
+
+        wb = writer.book
+        for ws in wb.worksheets:
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = ws.dimensions
+            for col_cells in ws.columns:
+                max_len = 0
+                letter = col_cells[0].column_letter
+                for cell in col_cells:
+                    try:
+                        max_len = max(max_len, len(str(cell.value or "")))
+                    except Exception:
+                        pass
+                ws.column_dimensions[letter].width = min(max(max_len + 2, 12), 42)
+
+    return output.getvalue()
+
+
+def render_descargas(historial: pd.DataFrame, df_changes: pd.DataFrame | None = None):
+    st.subheader("Descargas")
+    if historial is None or historial.empty:
+        st.info("Todavía no hay historial para descargar.")
+        return
+
+    excel_bytes = crear_excel_historial(historial, df_changes)
+    st.download_button(
+        "Descargar historial en Excel (.xlsx)",
+        excel_bytes,
+        "historial_cambios_onpe.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    with st.expander("Descarga técnica CSV"):
+        st.download_button(
+            "Descargar historial CSV",
+            preparar_cambios_para_mostrar(historial).to_csv(index=False).encode("utf-8-sig"),
+            "historial_cambios_onpe.csv",
+            "text/csv",
+        )
+
+
 def cargar_historial():
     if HISTORY_FILE.exists():
         try:
@@ -1641,12 +1942,9 @@ def run_consulta(include_provincias, include_extranjero, delay):
     return previous, snapshot, changes
 
 
-st.set_page_config(page_title="Monitor ONPE Desktop v38", layout="wide")
-st.title("Monitor ONPE — resumen corregido v38")
-
-st.write(
-    "Corrige el resumen: usa solo general/general y recuadro visible en modo oscuro."
-)
+st.set_page_config(page_title="Dashboard Electoral ONPE", layout="wide")
+render_css()
+render_header()
 
 if "auto_monitor" not in st.session_state:
     st.session_state.auto_monitor = False
@@ -1656,13 +1954,13 @@ if "last_refresh_count" not in st.session_state:
     st.session_state.last_refresh_count = -1
 
 with st.sidebar:
-    st.header("Configuración")
+    st.header("Consulta")
     include_provincias = st.checkbox("Monitorear provincias de Perú", value=False)
     include_extranjero = st.checkbox("Monitorear extranjero por continente y país", value=False)
     delay = st.slider("Pausa entre llamadas", min_value=0.1, max_value=2.0, value=0.4, step=0.1)
 
     st.divider()
-    st.header("Monitoreo automático")
+    st.header("Actualización automática")
     interval_choice = st.radio(
         "Refrescar revisión completa cada:",
         options=[2, 3, 5, 10],
@@ -1683,7 +1981,7 @@ with st.sidebar:
 
     st.caption("El intervalo automático es entre revisiones completas. La pausa entre llamadas es dentro de cada revisión.")
 
-consultar = st.button("Consultar ahora y comparar", type="primary")
+consultar = st.button("Actualizar datos y comparar", type="primary")
 limpiar = st.button("Limpiar base anterior")
 limpiar_historial = st.button("Limpiar historial de cambios")
 
@@ -1723,31 +2021,39 @@ if should_run:
     try:
         previous, snapshot, changes = run_consulta(include_provincias, include_extranjero, delay)
 
-        st.success(f"Consulta realizada: {snapshot['_meta']['fecha_consulta']}")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Lugares consultados", len(snapshot.get("lugares", {})))
-        c2.metric("Variaciones detectadas", len(changes))
-        c3.metric("Errores", sum(1 for v in snapshot.get("lugares", {}).values() if v.get("error")))
+        fecha_consulta = snapshot['_meta']['fecha_consulta']
+        st.success(f"Consulta realizada: {fecha_consulta}")
 
         rows = rows_snapshot(snapshot)
-        c4.metric("Columnas principales", "votos, %, actas")
+        df_snapshot = ordenar_columnas_principales(pd.DataFrame(rows_snapshot(snapshot)))
+
+        render_metric_cards(df_snapshot, changes, fecha_consulta)
+
+        st.markdown("---")
 
         if previous is None:
             st.info("Primera consulta guardada como base. La siguiente revisión mostrará cambios.")
         elif not changes:
-            st.success("No se detectaron cambios frente a la consulta anterior.")
+            render_lectura_rapida(pd.DataFrame(), df_snapshot)
         else:
-            st.warning(f"Se detectaron {len(changes)} variaciones.")
-            df_changes = pd.DataFrame(changes)
+            df_changes = preparar_cambios_ordenados(pd.DataFrame(changes))
+            render_lectura_rapida(df_changes, df_snapshot)
 
-            st.subheader("Variaciones resaltadas")
-            st.write("Amarillo = cambio en votos/porcentaje de candidato. Verde = subió. Rojo = bajó. Azul = lugar nuevo.")
-            st.dataframe(style_changes(preparar_cambios_para_mostrar(df_changes)), use_container_width=True)
+            st.subheader("Cambios importantes")
+            total_general_changes = cambios_total_general(df_changes)
+            candidate_changes = df_changes[df_changes["campo"].astype(str).str.contains("votos| %", case=False, na=False, regex=True)]
 
-            candidate_changes = df_changes[df_changes["campo"].str.contains(" votos| %", case=False, na=False, regex=True)]
-            if not candidate_changes.empty:
-                st.subheader("Cambios de votos/porcentaje por agrupación política")
-                st.dataframe(style_changes(preparar_cambios_para_mostrar(candidate_changes)), use_container_width=True)
+            if not total_general_changes.empty:
+                st.markdown("**Total general**")
+                st.dataframe(style_changes(preparar_cambios_para_mostrar(total_general_changes)), use_container_width=True, hide_index=True)
+            elif not candidate_changes.empty:
+                st.markdown("**Votos y porcentajes de candidatos**")
+                st.dataframe(style_changes(preparar_cambios_para_mostrar(candidate_changes.head(20))), use_container_width=True, hide_index=True)
+            else:
+                st.info("No hubo cambios principales en votos o total general.")
+
+            with st.expander("Ver detalle completo de cambios"):
+                st.dataframe(style_changes(preparar_cambios_para_mostrar(df_changes)), use_container_width=True, hide_index=True)
 
             resumen = (
                 df_changes.groupby(["ambito", "nivel"], dropna=False)
@@ -1755,32 +2061,13 @@ if should_run:
                 .reset_index()
                 .sort_values("cantidad_cambios", ascending=False)
             )
-            st.subheader("Resumen de cambios")
-            st.dataframe(preparar_tabla(resumen), use_container_width=True)
+            with st.expander("Ver resumen técnico por ámbito"):
+                st.dataframe(preparar_tabla(resumen), use_container_width=True, hide_index=True)
 
-            st.download_button(
-                "Descargar variaciones CSV",
-                preparar_cambios_para_mostrar(df_changes).to_csv(index=False).encode("utf-8"),
-                "variaciones_onpe.csv",
-                "text/csv",
-            )
-
-        st.subheader("Historial acumulado de cambios")
         historial = cargar_historial()
-        if historial.empty:
-            st.info("Todavía no hay historial acumulado de cambios.")
-        else:
-            st.dataframe(preparar_cambios_para_mostrar(historial), use_container_width=True)
-            st.download_button(
-                "Descargar historial de cambios CSV",
-                preparar_cambios_para_mostrar(historial).to_csv(index=False).encode("utf-8"),
-                "historial_cambios_onpe.csv",
-                "text/csv",
-            )
+        render_descargas(historial, pd.DataFrame(changes) if changes else pd.DataFrame())
 
-        st.subheader("Estado actual con votos, porcentajes y actas")
-
-        df_snapshot = ordenar_columnas_principales(pd.DataFrame(rows_snapshot(snapshot)))
+        st.subheader("Tabla principal")
 
         columnas_partidos = [
             c for c in df_snapshot.columns
@@ -1835,7 +2122,7 @@ if should_run:
 else:
     prev = load_previous()
     if prev:
-        st.info(f"Base guardada: {prev.get('_meta', {}).get('fecha_consulta')}. Puedes consultar ahora para comparar.")
+        st.info(f"Base guardada: {prev.get('_meta', {}).get('fecha_consulta')}. Puedes actualizar datos para comparar.")
         st.subheader("Base guardada")
         st.dataframe(preparar_tabla(ordenar_columnas_principales(pd.DataFrame(rows_snapshot(prev)))), use_container_width=True)
     else:

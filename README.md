@@ -1,7 +1,12 @@
-# Monitor ONPE Desktop v38 resumen corregido
+# Dashboard Electoral ONPE - versión final
 
-Correcciones:
-- El recuadro de resumen usa estrictamente la fila Nivel general / Ámbito general.
-- Ya no toma por error total / PERU ni total / EXTRANJERO.
-- El recuadro usa colores compatibles con modo oscuro y modo claro.
-- No agrega columnas nuevas a la tabla principal.
+Incluye:
+- interfaz renovada con título, tarjetas y diseño más amigable;
+- hora en Perú usando America/Lima;
+- resumen total corregido con la fila Nivel general / Ámbito general;
+- lectura rápida de cada actualización;
+- cambios importantes separados del detalle técnico;
+- historial descargable en Excel .xlsx con filtros y columnas ordenadas;
+- mantiene CSV como descarga técnica.
+
+Subir a GitHub solo estos archivos: app.py, requirements.txt, packages.txt y README.md.
