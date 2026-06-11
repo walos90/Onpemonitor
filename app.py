@@ -43,6 +43,38 @@ ID_ELECCION = 10
 SNAPSHOT_FILE = Path("snapshot_anterior_playwright_v5.json")
 HISTORY_FILE = Path("historial_cambios_onpe.csv")
 
+# Lista fija de departamentos de Perú.
+# Se usa porque /ubigeos/departamentos puede devolver HTML en Streamlit.
+# Los códigos son los ubigeos departamentales estándar usados por ONPE.
+DEPARTAMENTOS_PERU_FIJOS = [
+    {"ubigeo": "01", "nombre": "AMAZONAS"},
+    {"ubigeo": "02", "nombre": "ANCASH"},
+    {"ubigeo": "03", "nombre": "APURIMAC"},
+    {"ubigeo": "04", "nombre": "AREQUIPA"},
+    {"ubigeo": "05", "nombre": "AYACUCHO"},
+    {"ubigeo": "06", "nombre": "CAJAMARCA"},
+    {"ubigeo": "07", "nombre": "CALLAO"},
+    {"ubigeo": "08", "nombre": "CUSCO"},
+    {"ubigeo": "09", "nombre": "HUANCAVELICA"},
+    {"ubigeo": "10", "nombre": "HUANUCO"},
+    {"ubigeo": "11", "nombre": "ICA"},
+    {"ubigeo": "12", "nombre": "JUNIN"},
+    {"ubigeo": "13", "nombre": "LA LIBERTAD"},
+    {"ubigeo": "14", "nombre": "LAMBAYEQUE"},
+    {"ubigeo": "15", "nombre": "LIMA"},
+    {"ubigeo": "16", "nombre": "LORETO"},
+    {"ubigeo": "17", "nombre": "MADRE DE DIOS"},
+    {"ubigeo": "18", "nombre": "MOQUEGUA"},
+    {"ubigeo": "19", "nombre": "PASCO"},
+    {"ubigeo": "20", "nombre": "PIURA"},
+    {"ubigeo": "21", "nombre": "PUNO"},
+    {"ubigeo": "22", "nombre": "SAN MARTIN"},
+    {"ubigeo": "23", "nombre": "TACNA"},
+    {"ubigeo": "24", "nombre": "TUMBES"},
+    {"ubigeo": "25", "nombre": "UCAYALI"},
+]
+
+
 
 def fix_text(value: str) -> str:
     if not isinstance(value, str):
@@ -1014,8 +1046,8 @@ async def build_snapshot(include_provincias, include_extranjero, delay, status_b
         tot, part, err = await get_place_data(page, params_general(), "general", status_box)
         lugares["GENERAL"] = make_place("GENERAL", "general", "general", "general", tot, part, err)
 
-        tick("Listando departamentos de Perú...")
-        deps = await get_departamentos(page, 1)
+        tick("Cargando departamentos de Perú...")
+        deps = [dict(x) for x in DEPARTAMENTOS_PERU_FIJOS]
 
         for dep in deps:
             await asyncio.sleep(delay)

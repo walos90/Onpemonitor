@@ -45,3 +45,11 @@ Revisión realizada:
 - No hay botones CSV programados.
 - Se agregaron botones Excel por sección.
 - Se mantiene autoactualización más clara y tolerante a errores.
+
+
+## v60 departamentos fijos
+Cambio único:
+- La app ya no consulta `/ubigeos/departamentos` para Perú.
+- Usa una lista fija de departamentos de Perú.
+- La conexión general con ONPE no se modificó.
+- Esto evita que la consulta se caiga en “Listando departamentos de Perú”.

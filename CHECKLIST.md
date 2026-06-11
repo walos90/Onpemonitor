@@ -30,3 +30,12 @@
 - [x] Botones Excel por sección.
 - [x] Botón CSV automático de Streamlit oculto.
 - [x] Autoactualización más clara y tolerante a errores.
+
+
+## v60
+- [x] Cambio único aplicado: departamentos de Perú con lista fija.
+- [x] No se modificó make_page.
+- [x] No se modificó page_api.
+- [x] app.py compila.
+- [x] Sin variable real display.
+- [x] Sin botones CSV programados.
