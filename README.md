@@ -99,3 +99,8 @@ Correcciones:
   - Última actualización.
   - Último cambio detectado.
 - Ambas se muestran en hora Perú.
+
+
+## v54
+- Corrige error: name 'display' is not defined.
+- Revisión de compilación del archivo app.py.

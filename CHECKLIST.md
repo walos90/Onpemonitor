@@ -32,3 +32,5 @@ La autoactualización depende de que la pestaña de Streamlit permanezca abierta
 
 - [x] Muestra hora de la última actualización.
 - [x] Muestra hora de la última vez en que hubo un cambio.
+
+- [x] Eliminada referencia inválida a display.
