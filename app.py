@@ -2085,8 +2085,7 @@ Esta parte sirve para que no pierdas la base si Streamlit se reinicia o si actua
 
 def render_descargas(historial: pd.DataFrame, df_changes: pd.DataFrame | None = None, snapshot: Dict[str, Any] = None):
     """
-    Botón simple de descarga.
-    Descarga Excel .xlsx directamente, no CSV.
+    Descarga única en Excel. No genera botones CSV.
     """
     hay_historial = historial is not None and not historial.empty
     hay_cambios_actuales = df_changes is not None and not df_changes.empty
@@ -2097,7 +2096,7 @@ def render_descargas(historial: pd.DataFrame, df_changes: pd.DataFrame | None = 
             df_changes if hay_cambios_actuales else pd.DataFrame(),
         )
         st.download_button(
-            "Descargar actualizaciones en Excel",
+            "Descargar Excel",
             data=excel_bytes,
             file_name="actualizaciones_onpe.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

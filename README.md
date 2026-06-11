@@ -55,3 +55,8 @@ Correcciones:
 - Corrige inicialización de sesión ONPE para evitar "SessionInfo before it was initialized".
 - Abre primero el dominio principal y luego el resumen.
 - Usa domcontentloaded en vez de networkidle para no quedar atrapado en errores internos del frontend ONPE.
+
+
+## v47
+- Se verificó que no haya botones de descarga CSV.
+- El botón de descarga genera únicamente Excel .xlsx.
