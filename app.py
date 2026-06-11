@@ -1490,37 +1490,37 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
         f"""
 <style>
 .resumen-onpe-box {{
-  border: 1px solid rgba(128,128,128,0.45);
+  border: 1px solid rgba(120,120,120,.22);
   border-radius: 12px;
-  padding: 18px;
-  margin: 12px 0 22px 0;
-  background: rgba(128,128,128,0.10);
+  padding: 14px 16px;
+  margin: 10px 0 18px 0;
+  background: rgba(120,120,120,.04);
   color: inherit;
 }}
 .resumen-onpe-title {{
-  font-size: 18px;
-  font-weight: 800;
-  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 9px;
 }}
 .resumen-onpe-line {{
-  font-size: 16px;
-  margin-bottom: 7px;
+  font-size: 14px;
+  margin-bottom: 6px;
 }}
 .resumen-onpe-highlight {{
-  font-size: 17px;
-  font-weight: 800;
-  margin-top: 12px;
-  margin-bottom: 7px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 10px;
+  margin-bottom: 6px;
 }}
 .resumen-onpe-small {{
-  opacity: 0.72;
-  font-size: 13px;
-  margin-top: 12px;
+  opacity: .58;
+  font-size: 12px;
+  margin-top: 10px;
 }}
 </style>
 
 <div class="resumen-onpe-box">
-  <div class="resumen-onpe-title">Resultado total general actualizado</div>
+  <div class="resumen-onpe-title">Resumen general</div>
 
   <div class="resumen-onpe-line"><b>{c1}</b>: {votos_1} votos{pct_1_txt}</div>
   <div class="resumen-onpe-line"><b>{c2}</b>: {votos_2} votos{pct_2_txt}</div>
@@ -1529,7 +1529,7 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
   <div class="resumen-onpe-line"><b>Diferencia de votos:</b> {diff_votos}</div>
   <div class="resumen-onpe-line"><b>Diferencia en porcentaje:</b> {diff_pp_txt}</div>
 
-  <div class="resumen-onpe-small">Fila usada: Nivel general / Ámbito general</div>
+  <div class="resumen-onpe-small">Base: nivel general / ámbito general</div>
 </div>
         """,
         unsafe_allow_html=True,
@@ -1713,71 +1713,116 @@ def render_css():
     st.markdown(
         """
 <style>
-.block-container { padding-top: 1.4rem; }
-.onpe-hero {
-  border-radius: 22px;
-  padding: 24px 26px;
-  margin-bottom: 18px;
-  background: linear-gradient(135deg, rgba(25, 74, 160, .95), rgba(21, 126, 179, .86));
-  color: white;
-  box-shadow: 0 14px 38px rgba(0,0,0,.18);
+.block-container {
+  padding-top: 1.2rem;
+  padding-bottom: 2rem;
+  max-width: 1180px;
 }
-.onpe-hero h1 { margin: 0; font-size: 34px; letter-spacing: -.02em; }
-.onpe-hero p { margin: 8px 0 0 0; font-size: 16px; opacity: .94; }
+
+/* Minimal header */
+.onpe-hero {
+  border: 1px solid rgba(120,120,120,.22);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  background: rgba(120,120,120,.06);
+  color: inherit;
+  box-shadow: none;
+}
+.onpe-hero h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+.onpe-hero p {
+  margin: 6px 0 0 0;
+  font-size: 14px;
+  opacity: .72;
+}
 .onpe-pill {
   display: inline-block;
-  padding: 6px 11px;
+  padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.28);
-  font-size: 13px;
-  margin-bottom: 11px;
+  background: transparent;
+  border: 1px solid rgba(120,120,120,.28);
+  font-size: 12px;
+  opacity: .78;
+  margin-bottom: 8px;
 }
+
+/* Minimal metric cards */
 .metric-card {
-  border: 1px solid rgba(128,128,128,.22);
-  border-radius: 18px;
-  padding: 16px 17px;
-  background: rgba(128,128,128,.08);
-  min-height: 118px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.06);
+  border: 1px solid rgba(120,120,120,.22);
+  border-radius: 12px;
+  padding: 13px 14px;
+  background: rgba(120,120,120,.045);
+  min-height: 95px;
+  box-shadow: none;
 }
-.metric-card .label { font-size: 13px; opacity: .72; margin-bottom: 6px; }
-.metric-card .value { font-size: 24px; font-weight: 800; line-height: 1.15; }
-.metric-card .help { font-size: 12px; opacity: .68; margin-top: 8px; }
+.metric-card .label {
+  font-size: 12px;
+  opacity: .66;
+  margin-bottom: 5px;
+}
+.metric-card .value {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.metric-card .help {
+  font-size: 11px;
+  opacity: .55;
+  margin-top: 6px;
+}
+
+/* Simple sections */
 .section-card {
-  border: 1px solid rgba(128,128,128,.25);
-  border-radius: 18px;
-  padding: 18px 20px;
-  background: rgba(128,128,128,.07);
-  margin: 12px 0 18px 0;
+  border: 1px solid rgba(120,120,120,.20);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: rgba(120,120,120,.04);
+  margin: 10px 0 16px 0;
 }
 .quick-line {
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(128,128,128,.15);
-  font-size: 15px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(120,120,120,.12);
+  font-size: 14px;
 }
 .quick-line:last-child { border-bottom: none; }
-.small-muted { opacity: .70; font-size: 13px; }
+.small-muted { opacity: .62; font-size: 12px; }
+
+/* Streamlit tweaks */
+div[data-testid="stMetric"] {
+  border: 1px solid rgba(120,120,120,.20);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(120,120,120,.04);
+}
+h1, h2, h3 {
+  letter-spacing: -.01em;
+}
+hr {
+  margin: 1rem 0;
+  opacity: .35;
+}
 </style>
         """,
         unsafe_allow_html=True,
     )
-
 
 def render_header(fecha=None):
     fecha_txt = fecha or fecha_hora_peru()
     st.markdown(
         f"""
 <div class="onpe-hero">
-  <div class="onpe-pill">ONPE · seguimiento no oficial</div>
-  <h1>Dashboard Electoral ONPE</h1>
-  <p>Seguimiento de votos, actas, diferencia entre candidatos y variaciones detectadas.</p>
-  <p style="font-size:13px; opacity:.85; margin-top:10px;">Hora de referencia: {fecha_txt}</p>
+  <div class="onpe-pill">Seguimiento no oficial · ONPE</div>
+  <h1>Monitor electoral</h1>
+  <p>Votos, actas y variaciones. Hora Perú: {fecha_txt}</p>
 </div>
         """,
         unsafe_allow_html=True,
     )
-
 
 def render_metric_cards(df_snapshot: pd.DataFrame, changes=None, fecha=None):
     m = calcular_resumen_metricas(df_snapshot, changes)
@@ -1877,28 +1922,140 @@ def crear_excel_historial(historial: pd.DataFrame, cambios_actuales: pd.DataFram
     return output.getvalue()
 
 
-def render_descargas(historial: pd.DataFrame, df_changes: pd.DataFrame | None = None):
-    st.subheader("Descargas")
-    if historial is None or historial.empty:
-        st.info("Todavía no hay historial para descargar.")
-        return
 
-    excel_bytes = crear_excel_historial(historial, df_changes)
-    st.download_button(
-        "Descargar historial en Excel (.xlsx)",
-        excel_bytes,
-        "historial_cambios_onpe.xlsx",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+def snapshot_to_excel_bytes(snapshot: Dict[str, Any]) -> bytes:
+    """
+    Exporta la base actual completa en Excel.
+    """
+    if not snapshot:
+        return b""
+
+    df_snapshot = ordenar_columnas_principales(pd.DataFrame(rows_snapshot(snapshot)))
+    meta = pd.DataFrame([snapshot.get("_meta", {})])
+    raw_actas = pd.DataFrame(raw_actas_fields(snapshot))
+    raw_partidos = pd.DataFrame(raw_participantes_fields(snapshot))
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        sheets = {
+            "Base actual": preparar_tabla(df_snapshot),
+            "Meta": meta,
+        }
+        if not raw_actas.empty:
+            sheets["Actas crudas"] = preparar_tabla(raw_actas)
+        if not raw_partidos.empty:
+            sheets["Candidatos crudos"] = preparar_tabla(raw_partidos)
+
+        for sheet_name, df_sheet in sheets.items():
+            safe_name = str(sheet_name)[:31]
+            df_sheet.to_excel(writer, index=False, sheet_name=safe_name)
+            ws = writer.book[safe_name]
+            ws.freeze_panes = "A2"
+            if df_sheet.shape[1] > 0:
+                ws.auto_filter.ref = ws.dimensions
+            for col in ws.columns:
+                max_len = 0
+                letter = col[0].column_letter
+                for cell in col:
+                    try:
+                        max_len = max(max_len, len("" if cell.value is None else str(cell.value)))
+                    except Exception:
+                        pass
+                ws.column_dimensions[letter].width = min(max(max_len + 2, 12), 45)
+
+    return output.getvalue()
+
+
+def snapshot_to_json_bytes(snapshot: Dict[str, Any]) -> bytes:
+    if not snapshot:
+        return b""
+    return json.dumps(snapshot, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def restaurar_base_desde_upload(uploaded_file) -> bool:
+    if uploaded_file is None:
+        return False
+
+    try:
+        data = json.loads(uploaded_file.getvalue().decode("utf-8"))
+        if not isinstance(data, dict) or "lugares" not in data:
+            st.error("Ese archivo no parece ser una base válida de esta app.")
+            return False
+        save_snapshot(data)
+        st.success("Base restaurada correctamente. La próxima actualización comparará contra esa base.")
+        return True
+    except Exception as e:
+        st.error(f"No se pudo restaurar la base: {e}")
+        return False
+
+
+def render_respaldo_base(snapshot: Dict[str, Any] = None):
+    st.subheader("Respaldo de la base")
+
+    current = snapshot if snapshot else load_previous()
+
+    st.markdown(
+        """
+Esta parte sirve para que no pierdas la base si Streamlit se reinicia o si actualizas la app.
+
+- **Excel:** para revisar la base actual en Excel.
+- **JSON:** para guardar una copia exacta y restaurarla después.
+        """
     )
 
-    with st.expander("Descarga técnica CSV"):
-        st.download_button(
-            "Descargar historial CSV",
-            preparar_cambios_para_mostrar(historial).to_csv(index=False).encode("utf-8-sig"),
-            "historial_cambios_onpe.csv",
-            "text/csv",
-        )
+    if current:
+        fecha = current.get("_meta", {}).get("fecha_consulta", "sin fecha")
+        st.caption(f"Base disponible: {fecha} — hora Perú")
 
+        col1, col2 = st.columns(2)
+        col1.download_button(
+            "Descargar base actual en Excel",
+            data=snapshot_to_excel_bytes(current),
+            file_name="base_actual_onpe.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+        col2.download_button(
+            "Descargar respaldo JSON",
+            data=snapshot_to_json_bytes(current),
+            file_name="base_actual_onpe_respaldo.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+    else:
+        st.info("Todavía no hay base guardada. Haz una primera consulta para crearla.")
+
+    with st.expander("Restaurar una base anterior"):
+        uploaded = st.file_uploader(
+            "Sube el respaldo JSON que descargaste antes",
+            type=["json"],
+        )
+        if uploaded is not None:
+            if st.button("Restaurar base JSON"):
+                restaurar_base_desde_upload(uploaded)
+
+
+
+def render_descargas(historial: pd.DataFrame, df_changes: pd.DataFrame | None = None, snapshot: Dict[str, Any] = None):
+    """
+    Botón simple de descarga.
+    Descarga Excel .xlsx directamente, no CSV.
+    """
+    hay_historial = historial is not None and not historial.empty
+    hay_cambios_actuales = df_changes is not None and not df_changes.empty
+
+    if hay_historial or hay_cambios_actuales:
+        excel_bytes = crear_excel_historial(
+            historial if hay_historial else pd.DataFrame(),
+            df_changes if hay_cambios_actuales else pd.DataFrame(),
+        )
+        st.download_button(
+            "Descargar actualizaciones en Excel",
+            data=excel_bytes,
+            file_name="actualizaciones_onpe.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
 
 def cargar_historial():
     if HISTORY_FILE.exists():
@@ -1942,7 +2099,7 @@ def run_consulta(include_provincias, include_extranjero, delay):
     return previous, snapshot, changes
 
 
-st.set_page_config(page_title="Dashboard Electoral ONPE", layout="wide")
+st.set_page_config(page_title="Monitor electoral", layout="wide")
 render_css()
 render_header()
 
@@ -1960,7 +2117,7 @@ with st.sidebar:
     delay = st.slider("Pausa entre llamadas", min_value=0.1, max_value=2.0, value=0.4, step=0.1)
 
     st.divider()
-    st.header("Actualización automática")
+    st.header("Autoactualización")
     interval_choice = st.radio(
         "Refrescar revisión completa cada:",
         options=[2, 3, 5, 10],
@@ -1979,11 +2136,11 @@ with st.sidebar:
     if stop_auto:
         st.session_state.auto_monitor = False
 
-    st.caption("El intervalo automático es entre revisiones completas. La pausa entre llamadas es dentro de cada revisión.")
+    st.caption("La pausa ayuda a evitar errores por demasiadas llamadas seguidas.")
 
-consultar = st.button("Actualizar datos y comparar", type="primary")
-limpiar = st.button("Limpiar base anterior")
-limpiar_historial = st.button("Limpiar historial de cambios")
+consultar = st.button("Actualizar y comparar", type="primary")
+limpiar = st.button("Borrar base")
+limpiar_historial = st.button("Borrar historial")
 
 if limpiar:
     if SNAPSHOT_FILE.exists():
@@ -2065,7 +2222,7 @@ if should_run:
                 st.dataframe(preparar_tabla(resumen), use_container_width=True, hide_index=True)
 
         historial = cargar_historial()
-        render_descargas(historial, pd.DataFrame(changes) if changes else pd.DataFrame())
+        render_descargas(historial, pd.DataFrame(changes) if changes else pd.DataFrame(), snapshot)
 
         st.subheader("Tabla principal")
 

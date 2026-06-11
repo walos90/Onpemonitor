@@ -10,3 +10,25 @@ Incluye:
 - mantiene CSV como descarga técnica.
 
 Subir a GitHub solo estos archivos: app.py, requirements.txt, packages.txt y README.md.
+
+
+## v40
+Correcciones:
+- Descarga principal en Excel real .xlsx.
+- Sección Descargas más clara.
+- Respaldo de base actual en Excel.
+- Respaldo JSON para restaurar la base si Streamlit la pierde al actualizar.
+- Restauración de base desde JSON.
+
+
+## v41
+- Se eliminó la sección nueva de Descargas/Respaldo.
+- El botón de descarga existente ahora descarga directamente Excel .xlsx.
+- El CSV ya no aparece como descarga principal.
+
+
+## v42
+- Interfaz minimalista.
+- Título más simple.
+- Tarjetas y recuadros más limpios.
+- Menos texto visual y colores más sobrios.
