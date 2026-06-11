@@ -1,36 +1,34 @@
-# Checklist de depuración v52
+# Checklist v56 desde v42 estable
 
-## Requisitos pedidos
+## Base técnica
+- [x] Se partió de v42, indicada como última versión estable.
+- [x] No se modificó make_page.
+- [x] No se modificó page_api.
+- [x] No se modificó la lógica principal de conexión con ONPE.
+
+## Requisitos visuales y funcionales
 - [x] Interfaz minimalista y sencilla.
 - [x] Título simple: Monitor electoral.
-- [x] Hora en Perú.
+- [x] Hora Perú.
+- [x] Última actualización visible.
+- [x] Último cambio detectado visible.
 - [x] Resumen total usando solo Nivel general / Ámbito general.
-- [x] Diferencia de votos entre candidatos en recuadro separado.
-- [x] Tabla principal con columnas limpias.
+- [x] Diferencia de votos entre candidatos.
+- [x] Tabla principal limpia.
 - [x] Sin columna código.
 - [x] Sin participación ciudadana.
 - [x] Sin porcentajes de actas.
 - [x] Votos y porcentajes de candidatos conservados.
-- [x] Actas como números enteros.
-- [x] Actas con formato uniforme.
-- [x] Actualizaciones más ordenadas.
-- [x] Lectura rápida de actualización.
+- [x] Actas como enteros.
+- [x] Actualizaciones detectadas.
+- [x] Lectura rápida.
 - [x] Cambios importantes.
 - [x] Detalle completo de cambios.
 - [x] Historial acumulado.
-- [x] Descarga en Excel, no CSV.
+- [x] Campos originales de actas.
+- [x] Campos originales de candidatos.
 - [x] Botones Excel por sección.
-- [x] Oculto botón automático CSV de Streamlit en tablas.
-- [x] Campos originales de actas conservados.
-- [x] Campos originales de candidatos conservados.
-- [x] Consulta robusta con Playwright.
-- [x] Reintentos si ONPE devuelve HTML.
-- [x] Autoactualización más estable y con reintento tras errores.
-
-## Nota
-La autoactualización depende de que la pestaña de Streamlit permanezca abierta. Si el navegador, la computadora o Streamlit suspenden la sesión, puede pausarse.
-
-- [x] Muestra hora de la última actualización.
-- [x] Muestra hora de la última vez en que hubo un cambio.
-
-- [x] Eliminada referencia inválida a display.
+- [x] Sin botones CSV programados.
+- [x] Botón CSV automático de Streamlit oculto.
+- [x] Autoactualización más clara.
+- [x] Si una consulta automática falla, mantiene la base anterior y reintenta.

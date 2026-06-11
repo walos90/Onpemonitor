@@ -39,7 +39,6 @@ except Exception:
 
 BASE_ORIGIN = "https://resultadosegundavuelta.onpe.gob.pe"
 BASE = "/presentacion-backend"
-FRONT_PATH = "/main/resumen"
 ID_ELECCION = 10
 SNAPSHOT_FILE = Path("snapshot_anterior_playwright_v5.json")
 HISTORY_FILE = Path("historial_cambios_onpe.csv")
@@ -852,7 +851,7 @@ def candidate_display_metrics(candidatos: Dict[str, Any]) -> Dict[str, Any]:
 
 async def make_page():
     pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+    browser = await pw.chromium.launch(headless=True)
     context = await browser.new_context(
         locale="es-PE",
         user_agent=(
@@ -861,53 +860,23 @@ async def make_page():
         ),
     )
     page = await context.new_page()
-
-    # Inicialización suave: ONPE puede fallar si se entra directo a /main/resumen
-    # antes de que su SessionInfo esté lista.
-    try:
-        await page.goto(BASE_ORIGIN, wait_until="domcontentloaded", timeout=45000)
-        await page.wait_for_timeout(1200)
-    except Exception:
-        pass
-
-    try:
-        await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="domcontentloaded", timeout=45000)
-        await page.wait_for_timeout(2000)
-    except Exception:
-        # No detenemos aquí. La API se reintentará en page_api.
-        pass
-
+    await page.goto(f"{BASE_ORIGIN}/resumen", wait_until="domcontentloaded", timeout=45000)
     return pw, browser, page
 
 
-async def page_api(page, path: str, params: Dict[str, Any], retries: int = 4, timeout_ms: int = 18000):
-    """
-    Consulta API ONPE desde el navegador.
-    Si ONPE devuelve HTML, reinicializa la página y reintenta.
-    """
-    relative_url = endpoint(path, **params)
-    absolute_url = f"{BASE_ORIGIN}{relative_url}"
+async def page_api(page, path: str, params: Dict[str, Any], retries: int = 2, timeout_ms: int = 12000):
+    url = endpoint(path, **params)
     last_error = None
 
     for attempt in range(1, retries + 1):
         try:
-            # Asegura que el navegador tenga sesión/origen ONPE antes de pedir JSON.
-            if attempt > 1:
-                try:
-                    await page.goto(BASE_ORIGIN, wait_until="domcontentloaded", timeout=45000)
-                    await page.wait_for_timeout(800)
-                    await page.goto(f"{BASE_ORIGIN}{FRONT_PATH}", wait_until="domcontentloaded", timeout=45000)
-                    await page.wait_for_timeout(1500)
-                except Exception:
-                    pass
-
             result = await page.evaluate(
                 """async ({url, timeoutMs}) => {
                     const controller = new AbortController();
                     const t = setTimeout(() => controller.abort(), timeoutMs);
                     try {
                         const res = await fetch(url, {
-                            credentials: "include",
+                            credentials: "same-origin",
                             cache: "no-store",
                             signal: controller.signal,
                             headers: {
@@ -916,33 +885,23 @@ async def page_api(page, path: str, params: Dict[str, Any], retries: int = 4, ti
                             }
                         });
                         const text = await res.text();
-                        const contentType = res.headers.get("content-type") || "";
-                        return {status: res.status, text, contentType};
+                        return {status: res.status, text};
                     } finally {
                         clearTimeout(t);
                     }
                 }""",
-                {"url": absolute_url, "timeoutMs": timeout_ms},
+                {"url": url, "timeoutMs": timeout_ms},
             )
 
             text = (result.get("text") or "").strip()
-            status = result.get("status")
-            content_type = (result.get("contentType") or "").lower()
-
-            if status and int(status) >= 400:
-                raise RuntimeError(f"ONPE HTTP {status}")
-
-            if text.startswith("<") or "text/html" in content_type:
-                raise RuntimeError(f"ONPE devolvió HTML (status {status})")
-
-            parsed = json.loads(text)
-            return parsed.get("data", parsed)
-
+            if text.startswith("<"):
+                raise RuntimeError("ONPE devolvió HTML")
+            return json.loads(text).get("data", {})
         except Exception as e:
             last_error = e
-            await asyncio.sleep(0.8 * attempt)
+            await asyncio.sleep(0.5 * attempt)
 
-    raise RuntimeError(f"{last_error} | {relative_url}")
+    raise RuntimeError(f"{last_error} | {url}")
 
 
 async def get_departamentos(page, id_ambito: int):
@@ -1056,10 +1015,7 @@ async def build_snapshot(include_provincias, include_extranjero, delay, status_b
         lugares["GENERAL"] = make_place("GENERAL", "general", "general", "general", tot, part, err)
 
         tick("Listando departamentos de Perú...")
-        deps = await safe_call("departamentos de Perú", get_departamentos(page, 1), status_box)
-        if not isinstance(deps, list):
-            deps = []
-            status_box.warning("ONPE no devolvió la lista de departamentos. Se mostrará solo el total general.")
+        deps = await get_departamentos(page, 1)
 
         for dep in deps:
             await asyncio.sleep(delay)
@@ -1087,10 +1043,7 @@ async def build_snapshot(include_provincias, include_extranjero, delay, status_b
 
         if include_extranjero:
             tick("Listando continentes del extranjero...")
-            conts = await safe_call("continentes del extranjero", get_departamentos(page, 2), status_box)
-            if not isinstance(conts, list):
-                conts = []
-                status_box.warning("ONPE no devolvió la lista de extranjero. Se continuará con lo disponible.")
+            conts = await get_departamentos(page, 2)
             for cont in conts:
                 await asyncio.sleep(delay)
                 cont_code = cont["ubigeo"]
@@ -1587,7 +1540,7 @@ def mostrar_recuadro_resumen_candidatos(df: pd.DataFrame):
 }}
 
 /* Oculta la barra automática de Streamlit en tablas.
-   Ese botón descarga CSV y no se puede cambiar a Excel. */
+   Ese botón descarga CSV y no se puede convertir a Excel. */
 [data-testid="stElementToolbar"] {
   display: none !important;
 }
@@ -1899,22 +1852,6 @@ def render_header(fecha=None):
         unsafe_allow_html=True,
     )
 
-
-def obtener_hora_ultimo_cambio() -> str:
-    historial = cargar_historial()
-    if historial is None or historial.empty or "fecha_consulta" not in historial.columns:
-        return "Sin cambios registrados"
-
-    try:
-        fechas = historial["fecha_consulta"].dropna().astype(str)
-        fechas = fechas[fechas.str.strip() != ""]
-        if fechas.empty:
-            return "Sin cambios registrados"
-        return fechas.iloc[-1]
-    except Exception:
-        return "Sin cambios registrados"
-
-
 def render_metric_cards(df_snapshot: pd.DataFrame, changes=None, fecha=None):
     m = calcular_resumen_metricas(df_snapshot, changes)
     if not m:
@@ -1944,7 +1881,6 @@ def render_metric_cards(df_snapshot: pd.DataFrame, changes=None, fecha=None):
         st.markdown(f'<div class="metric-card"><div class="label">Última actualización</div><div class="value" style="font-size:18px;">{ultima_actualizacion}</div><div class="help">Última consulta exitosa · hora Perú</div></div>', unsafe_allow_html=True)
     with t2:
         st.markdown(f'<div class="metric-card"><div class="label">Último cambio detectado</div><div class="value" style="font-size:18px;">{ultimo_cambio}</div><div class="help">Última variación registrada · hora Perú</div></div>', unsafe_allow_html=True)
-
 
 def render_lectura_rapida(df_changes: pd.DataFrame, df_snapshot: pd.DataFrame):
     st.subheader("Lectura rápida de la actualización")
@@ -2020,28 +1956,6 @@ def crear_excel_historial(historial: pd.DataFrame, cambios_actuales: pd.DataFram
 
     return output.getvalue()
 
-
-
-
-def dataframe_simple_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Datos") -> bytes:
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_to_write = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
-        df_to_write.to_excel(writer, index=False, sheet_name=sheet_name[:31])
-        ws = writer.book[sheet_name[:31]]
-        ws.freeze_panes = "A2"
-        if df_to_write.shape[1] > 0:
-            ws.auto_filter.ref = ws.dimensions
-        for column_cells in ws.columns:
-            max_len = 0
-            letter = column_cells[0].column_letter
-            for cell in column_cells:
-                try:
-                    max_len = max(max_len, len("" if cell.value is None else str(cell.value)))
-                except Exception:
-                    pass
-            ws.column_dimensions[letter].width = min(max(max_len + 2, 12), 45)
-    return output.getvalue()
 
 
 def snapshot_to_excel_bytes(snapshot: Dict[str, Any]) -> bytes:
@@ -2157,91 +2071,10 @@ Esta parte sirve para que no pierdas la base si Streamlit se reinicia o si actua
 
 
 
-
-def dataframe_to_excel_bytes(sheets: Dict[str, pd.DataFrame]) -> bytes:
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        for sheet_name, df_sheet in sheets.items():
-            safe_name = str(sheet_name)[:31] or "Datos"
-            df_to_write = df_sheet.copy() if isinstance(df_sheet, pd.DataFrame) else pd.DataFrame()
-            df_to_write.to_excel(writer, index=False, sheet_name=safe_name)
-            ws = writer.book[safe_name]
-            ws.freeze_panes = "A2"
-            if df_to_write.shape[1] > 0:
-                ws.auto_filter.ref = ws.dimensions
-            for column_cells in ws.columns:
-                max_len = 0
-                letter = column_cells[0].column_letter
-                for cell in column_cells:
-                    try:
-                        max_len = max(max_len, len("" if cell.value is None else str(cell.value)))
-                    except Exception:
-                        pass
-                ws.column_dimensions[letter].width = min(max(max_len + 2, 12), 45)
-    return output.getvalue()
-
-
-
-def resumen_total_to_dataframe(df_snapshot: pd.DataFrame) -> pd.DataFrame:
-    resumen = obtener_resumen_total_candidatos(df_snapshot)
-    if not resumen:
-        return pd.DataFrame()
-    return pd.DataFrame([{
-        "candidato_1": resumen.get("candidato_1"),
-        "votos_1": resumen.get("votos_1"),
-        "porcentaje_1": resumen.get("porcentaje_1"),
-        "candidato_2": resumen.get("candidato_2"),
-        "votos_2": resumen.get("votos_2"),
-        "porcentaje_2": resumen.get("porcentaje_2"),
-        "va_adelante": resumen.get("lider"),
-        "diferencia_votos": resumen.get("diferencia_votos"),
-        "diferencia_puntos_porcentuales": resumen.get("diferencia_pp"),
-        "fila_usada": "nivel general / ámbito general",
-    }])
-
-
-def exportar_todas_las_tablas_excel(
-    df_snapshot: pd.DataFrame,
-    snapshot: Dict[str, Any],
-    historial: pd.DataFrame = None,
-    cambios_actuales: pd.DataFrame = None,
-) -> bytes:
-    """
-    Exporta todas las tablas relevantes en un solo Excel, con una hoja por tabla.
-    """
-    sheets = {
-        "Tabla principal": preparar_tabla(df_snapshot),
-    }
-
-    resumen_df = resumen_total_to_dataframe(df_snapshot)
-    if not resumen_df.empty:
-        sheets["Resumen total"] = preparar_tabla(resumen_df)
-
-    if cambios_actuales is not None and not cambios_actuales.empty:
-        sheets["Cambios actuales"] = preparar_cambios_para_mostrar(preparar_cambios_ordenados(cambios_actuales))
-
-    if historial is not None and not historial.empty:
-        sheets["Historial cambios"] = preparar_cambios_para_mostrar(historial)
-
-    raw_actas = pd.DataFrame(raw_actas_fields(snapshot))
-    if not raw_actas.empty:
-        sheets["Actas originales"] = preparar_tabla(raw_actas)
-
-    raw_partidos = pd.DataFrame(raw_participantes_fields(snapshot))
-    if not raw_partidos.empty:
-        sheets["Candidatos originales"] = preparar_tabla(raw_partidos)
-
-    meta = pd.DataFrame([snapshot.get("_meta", {})]) if snapshot else pd.DataFrame()
-    if not meta.empty:
-        sheets["Meta"] = meta
-
-    return dataframe_to_excel_bytes(sheets) if "dataframe_to_excel_bytes" in globals() else dataframe_simple_to_excel_bytes(sheets["Tabla principal"], "Tabla principal")
-
-
-
 def render_descargas(historial: pd.DataFrame, df_changes: pd.DataFrame | None = None, snapshot: Dict[str, Any] = None):
     """
-    Descarga única en Excel. No genera botones CSV.
+    Botón simple de descarga.
+    Descarga Excel .xlsx directamente, no CSV.
     """
     hay_historial = historial is not None and not historial.empty
     hay_cambios_actuales = df_changes is not None and not df_changes.empty
@@ -2252,7 +2085,7 @@ def render_descargas(historial: pd.DataFrame, df_changes: pd.DataFrame | None = 
             df_changes if hay_cambios_actuales else pd.DataFrame(),
         )
         st.download_button(
-            "Descargar Excel",
+            "Descargar actualizaciones en Excel",
             data=excel_bytes,
             file_name="actualizaciones_onpe.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2286,6 +2119,43 @@ def guardar_historial(changes, fecha_consulta):
     df_all = pd.concat([df_old, df_new], ignore_index=True)
     df_all.to_csv(HISTORY_FILE, index=False, encoding="utf-8")
 
+
+
+def dataframe_simple_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Datos") -> bytes:
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_to_write = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        safe_name = str(sheet_name)[:31] or "Datos"
+        df_to_write.to_excel(writer, index=False, sheet_name=safe_name)
+        ws = writer.book[safe_name]
+        ws.freeze_panes = "A2"
+        if df_to_write.shape[1] > 0:
+            ws.auto_filter.ref = ws.dimensions
+        for column_cells in ws.columns:
+            max_len = 0
+            letter = column_cells[0].column_letter
+            for cell in column_cells:
+                try:
+                    max_len = max(max_len, len("" if cell.value is None else str(cell.value)))
+                except Exception:
+                    pass
+            ws.column_dimensions[letter].width = min(max(max_len + 2, 12), 45)
+    return output.getvalue()
+
+
+def obtener_hora_ultimo_cambio() -> str:
+    historial = cargar_historial()
+    if historial is None or historial.empty or "fecha_consulta" not in historial.columns:
+        return "Sin cambios registrados"
+
+    try:
+        fechas = historial["fecha_consulta"].dropna().astype(str)
+        fechas = fechas[fechas.str.strip() != ""]
+        if fechas.empty:
+            return "Sin cambios registrados"
+        return fechas.iloc[-1]
+    except Exception:
+        return "Sin cambios registrados"
 
 
 def render_historial_seccion():
@@ -2423,7 +2293,7 @@ with st.sidebar:
     if st.session_state.last_auto_error:
         st.caption(f"Último error automático: {st.session_state.last_auto_error}")
 
-    st.caption("La autoactualización funciona mientras la pestaña esté abierta. Si la computadora o el navegador se suspenden, puede pausarse.")
+    st.caption("La autoactualización funciona mientras la pestaña esté abierta. Si el navegador o Streamlit suspenden la sesión, puede pausarse.")
 
 consultar = st.button("Actualizar y comparar", type="primary")
 limpiar = st.button("Borrar base")
@@ -2442,12 +2312,7 @@ if limpiar_historial:
 refresh_count = None
 if st.session_state.auto_monitor:
     if st_autorefresh is None:
-        st.warning("Autoactualización usando respaldo del navegador.")
-        st.markdown(
-            f'<meta http-equiv="refresh" content="{st.session_state.auto_interval_min * 60}">',
-            unsafe_allow_html=True,
-        )
-        refresh_count = st.session_state.last_refresh_count + 1
+        st.error("Falta instalar streamlit-autorefresh. Ejecuta: python3 -m pip install streamlit-autorefresh")
     else:
         refresh_count = st_autorefresh(
             interval=st.session_state.auto_interval_min * 60 * 1000,
@@ -2493,6 +2358,9 @@ if should_run:
             render_cambios_vacio_o_actuales(changes, df_snapshot)
 
         render_historial_seccion()
+
+        historial = cargar_historial()
+        render_descargas(historial, pd.DataFrame(changes) if changes else pd.DataFrame(), snapshot)
 
         st.subheader("Tabla principal")
 
