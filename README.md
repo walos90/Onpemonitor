@@ -32,3 +32,14 @@ Correcciones:
 - Título más simple.
 - Tarjetas y recuadros más limpios.
 - Menos texto visual y colores más sobrios.
+
+
+## v43
+- La app ya no se detiene si ONPE devuelve HTML al listar departamentos o extranjero.
+- Si falla esa lista, continúa mostrando el total general y lo disponible.
+
+
+## v44
+- Mantiene la consulta de departamentos.
+- Hace más robusta la consulta API: URL absoluta, sesión ONPE, reintentos y recarga si ONPE devuelve HTML.
+- Solo usa respaldo si ONPE falla después de varios intentos.

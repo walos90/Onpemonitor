@@ -851,7 +851,7 @@ def candidate_display_metrics(candidatos: Dict[str, Any]) -> Dict[str, Any]:
 
 async def make_page():
     pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True)
+    browser = await pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
     context = await browser.new_context(
         locale="es-PE",
         user_agent=(
@@ -864,19 +864,32 @@ async def make_page():
     return pw, browser, page
 
 
-async def page_api(page, path: str, params: Dict[str, Any], retries: int = 2, timeout_ms: int = 12000):
-    url = endpoint(path, **params)
+async def page_api(page, path: str, params: Dict[str, Any], retries: int = 4, timeout_ms: int = 18000):
+    """
+    Consulta API ONPE desde el navegador.
+    Si ONPE devuelve HTML, reinicializa la página y reintenta.
+    """
+    relative_url = endpoint(path, **params)
+    absolute_url = f"{BASE_ORIGIN}{relative_url}"
     last_error = None
 
     for attempt in range(1, retries + 1):
         try:
+            # Asegura que el navegador tenga sesión/origen ONPE antes de pedir JSON.
+            if attempt > 1:
+                try:
+                    await page.goto(f"{BASE_ORIGIN}/resumen", wait_until="domcontentloaded", timeout=45000)
+                    await page.wait_for_timeout(700)
+                except Exception:
+                    pass
+
             result = await page.evaluate(
                 """async ({url, timeoutMs}) => {
                     const controller = new AbortController();
                     const t = setTimeout(() => controller.abort(), timeoutMs);
                     try {
                         const res = await fetch(url, {
-                            credentials: "same-origin",
+                            credentials: "include",
                             cache: "no-store",
                             signal: controller.signal,
                             headers: {
@@ -885,23 +898,33 @@ async def page_api(page, path: str, params: Dict[str, Any], retries: int = 2, ti
                             }
                         });
                         const text = await res.text();
-                        return {status: res.status, text};
+                        const contentType = res.headers.get("content-type") || "";
+                        return {status: res.status, text, contentType};
                     } finally {
                         clearTimeout(t);
                     }
                 }""",
-                {"url": url, "timeoutMs": timeout_ms},
+                {"url": absolute_url, "timeoutMs": timeout_ms},
             )
 
             text = (result.get("text") or "").strip()
-            if text.startswith("<"):
+            status = result.get("status")
+            content_type = (result.get("contentType") or "").lower()
+
+            if status and int(status) >= 400:
+                raise RuntimeError(f"ONPE HTTP {status}")
+
+            if text.startswith("<") or "text/html" in content_type:
                 raise RuntimeError("ONPE devolvió HTML")
-            return json.loads(text).get("data", {})
+
+            parsed = json.loads(text)
+            return parsed.get("data", parsed)
+
         except Exception as e:
             last_error = e
-            await asyncio.sleep(0.5 * attempt)
+            await asyncio.sleep(0.8 * attempt)
 
-    raise RuntimeError(f"{last_error} | {url}")
+    raise RuntimeError(f"{last_error} | {relative_url}")
 
 
 async def get_departamentos(page, id_ambito: int):
@@ -1015,7 +1038,10 @@ async def build_snapshot(include_provincias, include_extranjero, delay, status_b
         lugares["GENERAL"] = make_place("GENERAL", "general", "general", "general", tot, part, err)
 
         tick("Listando departamentos de Perú...")
-        deps = await get_departamentos(page, 1)
+        deps = await safe_call("departamentos de Perú", get_departamentos(page, 1), status_box)
+        if not isinstance(deps, list):
+            deps = []
+            status_box.warning("ONPE no devolvió la lista de departamentos. Se mostrará solo el total general.")
 
         for dep in deps:
             await asyncio.sleep(delay)
@@ -1043,7 +1069,10 @@ async def build_snapshot(include_provincias, include_extranjero, delay, status_b
 
         if include_extranjero:
             tick("Listando continentes del extranjero...")
-            conts = await get_departamentos(page, 2)
+            conts = await safe_call("continentes del extranjero", get_departamentos(page, 2), status_box)
+            if not isinstance(conts, list):
+                conts = []
+                status_box.warning("ONPE no devolvió la lista de extranjero. Se continuará con lo disponible.")
             for cont in conts:
                 await asyncio.sleep(delay)
                 cont_code = cont["ubigeo"]
